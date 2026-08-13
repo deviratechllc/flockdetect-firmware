@@ -7,6 +7,7 @@
 #include "modules/ble/ble_spam.h"
 #if !defined(LITE_VERSION)
 #include "modules/ble/BLE_Suite.h"
+#include "modules/wifi/flock_detect.h"
 #else
 #include "modules/ble/ble_sniffer.h"
 #endif
@@ -37,6 +38,7 @@ void BleMenu::optionsMenu() {
 
 #if !defined(LITE_VERSION)
     options.push_back({"BLE Suite", [=]() { BleSuiteMenu(); }});
+    options.push_back({"FlockDetect BLE", flock_detect_ble_setup});
     options.push_back({"Ninebot", [=]() { BLENinebot(); }});
     options.push_back({"Presenter mode", [=]() { PresenterMode(hid_ble, true); }});
 #else

@@ -91,6 +91,42 @@ sequences and protocol state machines follow the upstream NFC HAL/stack.
   RFAL fork has no native Crypto1 support.
   Files: `src/modules/rfid/crypto1.{h,cpp}`.
 
+## Surveillance-device detection (`FlockDetect`)
+
+Bruce's `FlockDetect` WiFi module (`src/modules/wifi/flock_detect.{h,cpp}`)
+passively identifies Flock Safety ALPR gear and related surveillance devices.
+Its detection logic is **ported from** three upstream projects, adapted to
+Bruce's promiscuous-capture, UI and data model. The source file carries a header
+pointing back to this document.
+
+### flock-you — MIT
+- Upstream: <https://github.com/colonelpanichacks/flock-you>
+- License: MIT — Copyright (c) 2026 colonelpanichacks.
+- Used by: the wildcard-probe **Information-Element signature** builder and
+  matcher (`FLOCK_PROBE_IE_SIG_PRIMARY`, the IE-string canonicalizer, and the
+  phantom-overflow / TLV-resync tolerant IE walk).
+- Detection research credited upstream to **@NitekryDPaul** (OUI list and the
+  receiver-address technique), **Michael / DeFlockJoplin** (wildcard-probe
+  signature), and **Pintor & Atzori (2022)** (probe-request IE fingerprinting).
+
+### flock-you-wifi-recon — MIT
+- Upstream: <https://github.com/JakeSwiz/flock-you-wifi-recon>
+- License: MIT — Copyright (c) 2026 colonelpanichacks (fork by JakeSwiz).
+- Used by: the SSID text-pattern matcher (`Flock-XXXXXX`, `test_flck`,
+  `flock`/`flck` substrings), the hidden-SSID flagging + per-BSSID dedup, the
+  curated Flock / SoundThinking OUI tables, and the **BLE detector** (Raven
+  acoustic-sensor service UUIDs + firmware estimation, Flock-family device
+  names, and the XUNTONG `0x09C8` manufacturer ID).
+- SSID signatures credited upstream to **GainSec**'s 2025 Flock Safety research;
+  BLE/Manufacturer-ID research to **wgreenberg/flock-you**.
+
+### FlockSquawk — GPL-3.0
+- Upstream: <https://github.com/f1yaw4y/FlockSquawk>
+- License: GNU General Public License v3.0.
+- Used by: the tiered **CONFIRMED / SUSPICIOUS / INFO** alert model (device
+  tracking, first-seen anti-spam, alert takeover) and the surveillance-camera
+  vendor OUI table (curated from the **FlockOff** database).
+
 ## Bundled libraries (linked dependencies)
 
 Fetched via PlatformIO `lib_deps` (see `platformio.ini`) and linked into the
