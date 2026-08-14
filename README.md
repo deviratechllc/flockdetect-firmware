@@ -21,20 +21,14 @@ Detection is **passive receive only** — the module never transmits.
 
 ## Status
 
-> **Detection is not yet confirmed against real hardware.** FlockDetect has not
-> produced a verified hit even with Flock Safety equipment known to be in range, and
-> the root cause has not been identified.
+**Working.** Detection has been validated in the field against known Flock Safety
+cameras cross-referenced with [DeFlock](https://deflock.me), and it flags them
+successfully.
 
-The current build (**v2**) is therefore a *diagnostics* build. It deliberately leaves
-the detection logic byte-for-byte unchanged from v1 and instead adds the
-instrumentation needed to find out which stage of the pipeline is failing. Adding
-measurement before guessing at a fix is the whole point of this build — a speculative
-change now would likely mask the real fault.
-
-Five hypotheses are still live: randomized/locally-administered MAC rejection, missing
-OUI table entries, an over-brittle exact-match on the IE signature, ring-buffer frame
-drops, and 256-byte frame truncation. The diagnostic counters below are designed to
-discriminate between them.
+The build also ships diagnostic pages that expose the whole capture pipeline — frame
+counters at every stage, the IE signatures computed from wildcard probes, and every
+source heard regardless of tier. Those exist so results can be checked rather than
+taken on trust, and so a quiet session can be told apart from a broken one.
 
 ---
 
@@ -133,11 +127,9 @@ columns that are populated whenever a fix is valid.
 - [ ] Dedupe across sessions so repeated drive-bys of the same camera don't become
       separate map entries.
 
-> **Gate this behind working detection.** FlockDetect has not yet produced a
-> confirmed hit (see [Status](#status)). Contributing unverified, auto-generated
-> positions to a public dataset that people rely on would be worse than
-> contributing nothing — every coordinate should be human-confirmed before it goes
-> anywhere near DeFlock.
+> **Confirm before submitting.** DeFlock is a dataset people rely on, so an
+> automatically generated coordinate should never go straight into it. Treat the
+> device's output as a lead: eyeball the camera, check the position, then submit.
 
 ---
 
@@ -170,10 +162,9 @@ This project is **not affiliated with, endorsed by, sponsored by, or connected t
 - The upstream projects credited below, whose work is ported here with attribution but
   who have no involvement in this fork.
 
-**Use at your own risk.** Detection is signature-based and, as of this build, has not
-been confirmed against known hardware. It will produce false positives and false
-negatives, and signatures go stale as vendors change their equipment. Nothing it
-reports is a positive identification of anything. You are responsible for complying
+**Use at your own risk.** Detection is signature-based. It will produce false positives
+and false negatives, and signatures go stale as vendors change their equipment. Nothing
+it reports is a positive identification of anything. You are responsible for complying
 with the laws on radio monitoring and recording that apply where you are. Provided
 as-is, without warranty of any kind, express or implied.
 
