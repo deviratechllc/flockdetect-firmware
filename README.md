@@ -1,6 +1,7 @@
-![FlockDetect scanning](./media/flockdetect/flockdetect-scanning.png)
-
-![FlockDetect showing suspicious devices](./media/flockdetect/flockdetect-detections.png)
+<p align="center">
+  <img src="./media/flockdetect/flockdetect-scanning.png" width="400" alt="FlockDetect scanning, no devices found yet">
+  <img src="./media/flockdetect/flockdetect-detections.png" width="400" alt="FlockDetect listing three suspicious devices matched on OUI">
+</p>
 
 # FlockDetect
 
