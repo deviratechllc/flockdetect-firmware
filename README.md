@@ -1,294 +1,144 @@
-![Bruce Main Menu](./media/pictures/bruce_banner.jpg)
+![Bruce](./media/pictures/bruce_banner.jpg)
 
-# :shark: Bruce
+# FlockDetect
 
-Bruce is a versatile ESP32 firmware packed with offensive-security tools, built to make Red Team operations fast and portable.
+A private fork of the [Bruce](https://github.com/BruceDevices/firmware) ESP32 firmware
+that adds **FlockDetect** — a passive detector for Flock Safety ALPR gear and related
+surveillance devices, built for the **LilyGO T-Embed CC1101** (ESP32-S3, 16 MB flash /
+8 MB PSRAM).
 
-It also supports [M5Stack](https://shop.m5stack.com), [LILYGO](https://lilygo.cc) , [RockBase IoT](https://www.rockbaseiot.com) and [Elecrow](https://www.elecrow.com) products, and works great with the Cardputer, Sticks, M5Cores, T-Decks and T-Embeds.
+Everything Bruce already does is still here. This fork adds one module,
+`src/modules/wifi/flock_detect.{h,cpp}`, reachable from two menu entries:
 
-## :zap: Get Our Official DevKit!
+- `WiFi → FlockDetect`
+- `Bluetooth → FlockDetect BLE`
 
-# RF REAPER
+Detection is **passive receive only** — the module never transmits.
 
-**RF REAPER** is our custom PCB devkit, purpose-built for Bruce!
+---
 
-Every major feature works natively, right out of the box. Sub-GHz, NFC/RFID, IR, 2.4GHz(NRF), GPS-ready, and a microSD, all driven by a beefy ESP32-S3 (16MB Flash / 8MB PSRAM). Tons of GPIOs via the AW9523 expander plus Flipper Zero & iButton header compatibility mean you can hack, mod, and build on it endlessly. Want a specific function? Ask us with an issue, we'll check it.
+## Status
 
-👉 **[Buy the RF REAPER and official boards](https://shop.bruce.computer)**
+> **Detection is not yet confirmed against real hardware.** FlockDetect has not
+> produced a verified hit even with Flock Safety equipment known to be in range, and
+> the root cause has not been identified.
 
-**Check our fully open-source hardware too:** https://bruce.computer/boards
+The current build (**v2**) is therefore a *diagnostics* build. It deliberately leaves
+the detection logic byte-for-byte unchanged from v1 and instead adds the
+instrumentation needed to find out which stage of the pipeline is failing. Adding
+measurement before guessing at a fix is the whole point of this build — a speculative
+change now would likely mask the real fault.
 
-More custom devkit boards coming soon! Stay across our communities!
+Five hypotheses are still live: randomized/locally-administered MAC rejection, missing
+OUI table entries, an over-brittle exact-match on the IE signature, ring-buffer frame
+drops, and 256-byte frame truncation. The diagnostic counters below are designed to
+discriminate between them.
 
-## :building_construction: How to install
+---
 
-### The easiest way to install Bruce is using our official Web Flasher!
+## How it detects
 
-### Check out: https://bruce.computer/flasher
+Four independent vectors feed a tiered **CONFIRMED / SUSPICIOUS / INFO** model.
+CONFIRMED fires an alert takeover with buzzer and LED; SUSPICIOUS and INFO are
+list-only.
 
-Alternatively, you can download the latest binary from releases or actions and flash locally using esptool.py
+| Vector | Signal |
+|---|---|
+| IE signature | Information-Element fingerprint of a Flock camera's wildcard probe request |
+| SSID patterns | `Flock-XXXXXX`, `test_flck`, `Penguin-<10 digits>`, `FS Ext Battery`, `flock`/`flck` substrings |
+| Hidden SSID | Beacons with an empty SSID element from a Flock-family OUI, deduplicated per BSSID |
+| OUI tables | Flock, SoundThinking/ShotSpotter, and surveillance-camera vendor prefixes |
+
+BLE adds Raven acoustic-sensor service UUIDs (with a firmware-generation estimate),
+Flock-family device names, and the XUNTONG `0x09C8` manufacturer ID.
+
+Detections can be logged to SD as CSV, optionally GPS-tagged.
+
+---
+
+## Diagnostics
+
+`SEL → Diagnostics`. Then **SEL** cycles pages, **Up/Dn** scrolls, **ESC** returns to
+the list.
+
+1. **Capture chain** — a counter at every boundary from the promiscuous callback
+   through the ring buffer, the parser, and the classifier. If `rx all` is 0 the radio
+   callback never fired; if `localMacRej` is high while `cand oui` is 0 the target is
+   MAC-randomizing; if `ringHigh` approaches the ring size, frames are being dropped.
+2. **IE signatures** — the signatures actually computed from wildcard probes, recorded
+   *before* the match test so a near-miss against the expected constant is visible
+   rather than silently discarded.
+3. **All sources** — every management-frame source heard this session regardless of
+   tier, with its real OUI. This is how a target's MAC surfaces when it never scores.
+
+With `SD Log: ON`, a companion `flockdiag_*.csv` is written alongside the detection log
+for offline analysis — useful because the device is normally flashed over USB rather
+than kept on a serial console.
+
+---
+
+## Build and flash
 
 ```sh
-esptool.py --port /dev/ttyACM0 write_flash 0x00000 Bruce-<device>.bin
+pio run -e lilygo-t-embed-cc1101
 ```
 
-**For m5stack devices**
+That produces a merged image at `Bruce-lilygo-t-embed-cc1101.bin` in the project root
+(bootloader + partition table + app), plus the app-only image at
+`.pio/build/lilygo-t-embed-cc1101/firmware.bin`.
 
-If you already use M5Launcher to manage your m5stack device, you can install it with OTA
+```sh
+esptool.py --chip esp32s3 --baud 921600 write_flash 0x0 Bruce-lilygo-t-embed-cc1101.bin
+```
 
-Or you can burn it directly from the [m5burner tool](https://docs.m5stack.com/en/download), just search for 'Bruce' (My official builds will be uploaded by "owner" and have photos.) on the device category you want to and click on burn
+If the board doesn't enter download mode on its own, hold **BOOT** while tapping
+**RESET**. Prebuilt images are attached to the [releases](../../releases).
 
-## :keyboard: Discord Server
+### Verifying a build works
 
-Contact us in our [Discord Server](https://discord.gg/WJ9XF9czVT)!
+Before trusting a negative result, ground-truth the SSID vector: bring up any AP named
+`Flock-A1B2C3` or `test_flck`. It must fire CONFIRMED within a channel sweep. If it
+doesn't, the fault is in capture rather than in the signature tables — go to diagnostics
+page 1.
 
-## :bookmark_tabs: Wiki
+---
 
-For more information on each function supported by Bruce, [read our wiki here](https://wiki.bruce.computer/).
-Also, [read our FAQ](https://wiki.bruce.computer/faq/)
+## Upstream Bruce
 
-## :computer: List of Features
+This fork tracks [BruceDevices/firmware](https://github.com/BruceDevices/firmware).
+The original project README — install options, supported boards, the full feature list,
+contributing guidelines and community links — is preserved verbatim at
+**[README-Bruce.md](./README-Bruce.md)**.
 
-<details>
-  <summary><h2>WiFi</h2></summary>
+Bruce is licensed AGPL-3.0; see [LICENSE](./LICENSE).
 
-- [x] Connect to WiFi
-- [x] WiFi AP
-- [x] Disconnect WiFi
-- [x] [WiFi Atks](https://wiki.bruce.computer/features/wifi/#wifi-atks)
-  - [x] [Beacon Spam](https://wiki.bruce.computer/features/wifi/#beacon-spam)
-  - [x] [Target Atk](https://wiki.bruce.computer/features/wifi/#target-atks)
-    - [x] Information
-    - [x] Target Deauth
-    - [x] EvilPortal + Deauth
-  - [x] Deauth Flood (More than one target)
-- [x] [Wardriving](https://wiki.bruce.computer/features/gps/#wardriving)
-- [x] [TelNet](https://wiki.bruce.computer/features/wifi/#telnet)
-- [x] [SSH](https://wiki.bruce.computer/features/wifi/#ssh)
-- [x] [RAW Sniffer](https://wiki.bruce.computer/features/wifi/#raw-sniffer)
-- [x] [TCP Client](https://wiki.bruce.computer/features/wifi/#client-tcp)
-- [x] [TCP Listener](https://wiki.bruce.computer/features/wifi/#listen-tcp)
-- [x] [Evil Portal](https://wiki.bruce.computer/features/wifi/#evil-portal)
-- [x] [Scan Hosts](https://wiki.bruce.computer/features/wifi/#scan-hosts) (with TCP Port scanning)
-- [x] [Responder](https://wiki.bruce.computer/features/wifi/#responder)
-- [x] [Arp Spoofing](https://wiki.bruce.computer/features/wifi/#arp-spoofing)
-- [x] [Arp Poisoning](https://wiki.bruce.computer/features/wifi/#arp-poisoning)
-- [x] [Wireguard Tunneling](https://wiki.bruce.computer/features/wifi/#wireguard-tunneling)
-- [x] Brucegotchi
-  - [x] Pwnagotchi friend
-  - [x] Pwngrid spam faces & names
-    - [x] [Optional] DoScreen a very long name and face
-    - [x] [Optional] Flood uniq peer identifiers
+---
 
-</details>
+## Credits
 
-<details>
-  <summary><h2>BLE</h2></summary>
+FlockDetect is a port, not original research. The detection logic comes from four
+upstream projects, adapted to Bruce's promiscuous-capture path, UI and data model.
+Full per-function attribution — including which upstream contributed which routine —
+is in **[THIRD_PARTY.md](./THIRD_PARTY.md)**.
 
-- [x] [BLE Scan](https://wiki.bruce.computer/features/ble/#ble-scan)
-- [x] Bad BLE - Run Ducky scripts, similar to [BadUsb](https://wiki.bruce.computer/features/ble/#badble)
-- [x] BLE Keyboard - Cardputer and T-Deck Only
-- [x] iOS Spam
-- [x] Windows Spam
-- [x] Samsung Spam
-- [x] Android Spam
-- [x] Spam All
-</details>
+| Project | | Contributed |
+|---|---|---|
+| **[colonelpanichacks/flock-you](https://github.com/colonelpanichacks/flock-you)** | MIT | The wildcard-probe Information-Element signature builder and matcher, the IE-string canonicalizer, and the phantom-overflow / TLV-resync tolerant IE walk. |
+| **[JakeSwiz/flock-you-wifi-recon](https://github.com/JakeSwiz/flock-you-wifi-recon)** | MIT¹ | SSID text-pattern matching, hidden-SSID flagging with per-BSSID dedup, the curated Flock / SoundThinking OUI tables, and the BLE detector (Raven service UUIDs, device names, XUNTONG manufacturer ID). |
+| **[f1yaw4y/FlockSquawk](https://github.com/f1yaw4y/FlockSquawk)** | GPL-3.0 | The tiered CONFIRMED / SUSPICIOUS / INFO alert model — device tracking, first-seen anti-spam, alert takeover — and the surveillance-camera vendor OUI table curated from the FlockOff database. |
+| **[wgreenberg/flock-you](https://github.com/wgreenberg/flock-you)** | — ² | BLE manufacturer-ID research behind the XUNTONG detection. |
 
-<details>
-  <summary><h2>RF</h2></summary>
+¹ MIT per the source headers, © 2026 colonelpanichacks (fork by JakeSwiz); the repository
+carries no separate `LICENSE` file.
+² No license file published upstream at the time of writing; credited here for research,
+no code was taken directly.
 
-- [x] Scan/Copy
-- [x] [Custom SubGhz](https://wiki.bruce.computer/features/rf/#replay-payloads-like-flipper)
-- [x] Spectrum
-- [x] Jammer Full (sends a full squared wave into output)
-- [x] Jammer Intermittent (sends PWM signal into output)
-- [x] Config
-  - [x] RF TX Pin
-  - [x] RF RX Pin
-  - [x] RF Module
-    - [x] RF433 T/R M5Stack
-    - [x] [CC1101 (Sub-Ghz)](https://wiki.bruce.computer/features/rf/#cc1101)
-  - [x] RF Frequency
-- [x] Replay
-</details>
+Underlying research credited by those projects: **@NitekryDPaul** (OUI list, receiver-address
+technique), **Michael / DeFlockJoplin** (wildcard-probe signature), **GainSec** (2025 Flock
+Safety SSID research), **Jon Gaines**, and **Pintor & Atzori (2022)** (probe-request IE
+fingerprinting).
 
-<details>
-  <summary><h2>RFID</h2></summary>
+---
 
-- [x] Read tag
-- [x] Read 125kHz
-- [x] Clone tag
-- [x] Write NDEF records
-- [x] Amiibolink
-- [x] Chameleon
-- [x] Write data
-- [x] Erase data
-- [x] Save file
-- [x] Load file
-- [x] Config
-  - [x] [RFID Module](https://wiki.bruce.computer/features/rfid/#supported-modules)
-    - [x] PN532
-    - [x] PN532Killer
-- [ ] Emulate tag
-</details>
-
-<details>
-  <summary><h2>IR</h2></summary>
-
-- [x] TV-B-Gone
-- [x] IR Receiver
-- [x] [Custom IR (NEC, NECext, SIRC, SIRC15, SIRC20, Samsung32, RC5, RC5X, RC6)](https://wiki.bruce.computer/features/ir/#replay-payloads-like-flipper)
-- [x] Config - [X] Ir TX Pin - [X] Ir RX Pin
-</details>
-
-<details>
-  <summary><h2>FM</h2></summary>
-
-- [x] [Broadcast standard](https://wiki.bruce.computer/features/fm/#broadcast-standard)
-- [x] [Broadcast reserved](https://wiki.bruce.computer/features/fm/#broadcast-standard)
-- [x] [Broadcast stop](https://wiki.bruce.computer/features/fm/#broadcast-stop)
-- [ ] [FM Spectrum](https://wiki.bruce.computer/features/fm/#fm-spectrum)
-- [ ] [Hijack Traffic Announcements](https://wiki.bruce.computer/features/fm/#hijack-ta)
-- [ ] [Config](https://wiki.bruce.computer/features/fm/#bookmark_tabs-config)
-</details>
-
-<details>
-  <summary><h2>NRF24</h2></summary>
-
-- [x] [NRF24 Jammer](https://wiki.bruce.computer/features/nrf24/)
-- [x] 2.4G Spectrum
-- [ ] Mousejack
-</details>
-
-<details>
-  <summary><h2>Scripts</h2></summary>
-
-- [x] [JavaScript Interpreter](https://wiki.bruce.computer/features/js-interpreter/) [Credits to justinknight93](https://github.com/justinknight93/Doolittle)
-</details>
-
-<details>
-  <summary><h2>Others</h2></summary>
-
-- [x] Mic Spectrum
-- [x] [QRCodes](https://wiki.bruce.computer/features/others/#qrcodes)
-  - [x] Custom
-  - [x] PIX (Brazil bank transfer system)
-- [x] [SD Card Mngr](https://github.com/pr3y/Bruce/wiki/Others#sd-card-mngr)
-  - [x] View image (jpg)
-  - [x] File Info
-  - [x] [Wigle Upload](https://wiki.bruce.computer/features/gps/#how-to-use-wigle)
-  - [x] Play Audio
-  - [x] View File
-- [x] LittleFS Mngr
-- [x] [WebUI](https://wiki.bruce.computer/controlling-device/webui/)
-  - [x] Server Structure
-  - [x] Html
-  - [x] SDCard Mngr
-  - [x] Spiffs Mngr
-- [x] Megalodon
-- [x] [BADUsb (New features, LittleFS and SDCard)](https://wiki.bruce.computer/features/others/#badusb)
-- [x] USB Keyboard - Cardputer and T-Deck Only
-- [x] [iButton](https://wiki.bruce.computer/features/others/#ibutton)
-- [x] LED Control
-</details>
-
-<details>
-  <summary><h2>Clock</h2></summary>
-
-- [x] RTC Support
-- [x] NTP time adjust
-- [x] Manual adjust
-</details>
-
-<details>
-  <summary><h2>Connect (ESPNOW)</h2></summary>
-
-- [x] Send File
-- [x] Receive File
-- [x] Send Commands
-- [x] Receive Commands
-</details>
-
-<details>
-  <summary><h2>Config</h2></summary>
-
-- [x] Brightness
-- [x] Dim Time
-- [x] Orientation
-- [x] UI Color
-- [x] Boot Sound on/off
-- [x] Clock
-- [x] Sleep
-- [x] Restart
-</details>
-
-## Specific functions per Device, the ones not mentioned here are available to all.
-
-| Device                                                                                                                                                                                      | CC1101 | NRF24 | FM Radio |        PN532         | Mic  | BadUSB | RGB Led | Speaker | Fuel Gauge | LITE_VERSION |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----: | :---: | :------: | :------------------: | :--: | :----: | :-----: | :-----: | :--------: | :----------: |
-| [M5Stack Cardputer](https://shop.m5stack.com/products/m5stack-cardputer-kit-w-m5stamps) (and ADV)                                                                                           |  :ok:  | :ok:  |   :ok:   |         :ok:         | :ok: |  :ok:  |  :ok:   | NS4168  |    :x:     |     :x:      |
-| [M5Stack M5StickC PLUS2](https://shop.m5stack.com/products/m5stickc-plus2-esp32-mini-iot-development-kit)                                                                                   |  :ok:  | :ok:  |   :ok:   |         :ok:         | :ok: | :ok:¹  |   :x:   |  Tone   |    :x:     |     :x:      |
-| [M5Stack M5StickC PLUS](https://shop.m5stack.com/products/m5stickc-plus-esp32-pico-mini-iot-development-kit)                                                                                |  :ok:  | :ok:  |   :ok:   |         :ok:         | :ok: | :ok:¹  |   :x:   |  Tone   |    :x:     |     :x:²     |
-| [M5Stack M5Core BASIC](https://shop.m5stack.com/products/basic-core-iot-development-kit)                                                                                                    |  :ok:  | :ok:  |   :ok:   |         :ok:         | :ok: | :ok:¹  |   :x:   |  Tone   |    :x:     |     :x:      |
-| [M5Stack M5Core2](https://shop.m5stack.com/products/m5stack-core2-esp32-iot-development-kit-v1-1)                                                                                           |  :ok:  | :ok:  |   :ok:   |         :ok:         | :ok: | :ok:¹  |   :x:   |   :x:   |    :x:     |     :x:      |
-| [M5Stack M5CoreS3](https://shop.m5stack.com/products/m5stack-cores3-esp32s3-lotdevelopment-kit)/[SE](https://shop.m5stack.com/products/m5stack-cores3-se-iot-controller-w-o-battery-bottom) |  :ok:  | :ok:  |   :ok:   |         :ok:         | :x:  |  :ok:  |   :x:   |   :x:   |    :x:     |     :x:      |
-| [JCZN CYD&#x2011;2432S028](https://www.aliexpress.us/item/3256804774970998.html)                                                                                                            |  :ok:  | :ok:  |   :ok:   |         :ok:         | :x:  | :ok:¹  |   :x:   |   :x:   |    :x:     |     :x:²     |
-| [Lilygo T&#x2011;Embed CC1101](https://lilygo.cc/products/t-embed-cc1101)                                                                                                                   |  :ok:  | :ok:  |   :ok:   |         :ok:         | :ok: |  :ok:  |  :ok:   |  :ok:   |    :ok:    |     :x:      |
-| [Lilygo T&#x2011;Embed](https://lilygo.cc/products/t-embed)                                                                                                                                 |  :ok:  | :ok:  |   :ok:   |         :ok:         | :ok: |  :ok:  |  :ok:   |  :ok:   |    :x:     |     :x:      |
-| [Lilygo T-Display-S3](https://lilygo.cc/products/t-display-s3)                                                                                                                              |  :ok:  | :ok:  |   :x:    |         :x:          | :x:  |  :ok:  |   :x:   |   :x:   |    :x:     |     :x:      |
-| [Lilygo T&#x2011;Deck](https://lilygo.cc/products/t-deck) ([and pro](https://lilygo.cc/products/t-deck-plus-1))                                                                             |  :ok:  |  :x:  |   :x:    |         :x:          | :x:  |  :ok:  |   :x:   |   :x:   |    :x:     |     :x:      |
-| [Lilygo T-Watch-S3](https://lilygo.cc/products/t-watch-s3)                                                                                                                                  |  :x:   |  :x:  |   :x:    |         :x:          | :x:  |  :ok:  |   :x:   |   :x:   |    :x:     |     :x:      |
-| [Lilygo T-LoRa Pager](https://lilygo.cc/products/t-lora-pager)                                                                                                                              |  :x:   |  :x:  |   :x:    |         :x:          | :x:  |  :ok:  |   :x:   |   :x:   |    :x:     |     :x:      |
-| [Smoochiee V2](https://www.pcbway.com/project/shareproject/Bruce_PCB_Smoochiee_d6a0284b.html)                                                                                               |  :ok:  | :ok:  |   :x:    |         :ok:         | :x:  |  :ok:  |   :x:   |   :x:   |    :x:     |     :x:      |
-| [ESP32-C5](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32c5/esp32-c5-devkitc-1/user_guide.html)                                                                           |  :ok:  | :ok:  |   :x:    |         :ok:         | :x:  |  :x:   |   :x:   |   :x:   |    :x:     |     :x:      |
-| [Bruce RF Reaper](https://www.elecrow.com/bruce-pcb-rf-reaper.html)                                                                                                                         |  :ok:  | :ok:  |   :x:    | :ok: but w/ ST25R3916 | :x:  |  :ok:  |  :ok:   |   :x:   |    :ok:    |     :x:      |
-| [Elecrow 24B](https://www.elecrow.com/2-4inch-esp32-miner-lcd-display-2pcs-cryptocurrency-solo-miner-with-1000kh-s-hashrate.html)                                                            |  :ok:  | :ok:  |   :ok:   |         :ok:         | :x:  | :ok:¹  |   :x:   |   :x:   |    :x:     |     :x:²     |
-| [Elecrow 3.5"](https://www.elecrow.com/esp-terminal-with-esp32-3-5-inch-parallel-480x320-tft-capacitive-touch-display-rgb-by-chip-ili9488.html)                                                                                                                                                        |  :ok:  | :ok:  |   :ok:   |         :ok:         | :x:  | :ok:¹  |   :x:   |   :x:   |    :x:     |     :x:²     |
-| [NM-CYD-C5 + RF HAT](https://https://rockbase.shop/products/nm-cyd-c5-colorful)                                                                                                                         |  :ok:  | :ok:  |   :x:    | :ok: | :x:  |  :ok:  |  :ok:   |   :x:   |    :ok:    |     :x:      |
-² CYD have a LITE_VERSION version for Launcher Compatibility
-¹ Core, CYD and StickCs Bad-USB: [here](https://wiki.bruce.computer/features/others/#badusb)
-
-_LITE_VERSION_: TelNet, SSH, WireGuard, ScanHosts, RawSniffer, Brucegotchi, BLEBacon, BLEScan and Interpreter are NOT available for M5Launcher Compatibility
-
-## :sparkles: Why and how does it look?
-
-Bruce stems from a keen observation within the community focused on devices like Flipper Zero. While these devices offered a glimpse into the world of offensive security, there was a palpable sense that something more could be achieved without being that overpriced, particularly with the robust and modular hardware ecosystem provided by ESP32 Devices, Lilygo and M5Stack products.
-
-![Bruce Main Menu](./media/pictures/pic1.png)
-![Bruce on M5Core](./media/pictures/core.png)
-![Bruce on Stick](./media/pictures/stick.png)
-![Bruce on CYD](./media/pictures/cyd.png)
-![Bruce on CYD with NM-RF-HAT](./media/pictures/bruce-cyd.png)
-
-Other media can be [found here](./media/).
-
-## :clap: Acknowledgements
-
-- [@bmorcelli](https://github.com/bmorcelli) for new core and a bunch of new features, also porting to many devices!
-- [@IncursioHack](https://github.com/IncursioHack) for adding RF and RFID modules features.
-- [@Luidiblu](https://github.com/Luidiblu) for logo and UI design assistance.
-- [@eadmaster](https://github.com/eadmaster) for adding a lot of features.
-- [@rennancockles](https://github.com/rennancockles) for a lot of RFID code, refactoring and others features.
-- [@7h30th3r0n3](https://github.com/7h30th3r0n3) refactoring and a lot of help with WiFi attacks.
-- [@Tawank](https://github.com/Tawank) refactoring interpreter among many other things
-- @pablonymous RF functions to read RAW Data
-- [Smoochiee](https://github.com/smoochiee) for Bruce PCB design.
-- TH3_KR4K3N for Stick cplus extender PCB design.
-- Everyone who contributed in some way to the project, thanks :heart:
-
-Bruce also stands on the shoulders of other great open-source firmware projects,
-which inspired features and code across the project:
-
-- [ESP32Marauder](https://github.com/justcallmekoko/ESP32Marauder) by [@justcallmekoko](https://github.com/justcallmekoko) — WiFi/Bluetooth offensive toolkit.
-- [Launcher](https://github.com/bmorcelli/Launcher) by [@bmorcelli](https://github.com/bmorcelli) — the multi-app launcher/bootloader for the devices.
-- [Evil-M5Project](https://github.com/7h30th3r0n3/Evil-M5Project) by [@7h30th3r0n3](https://github.com/7h30th3r0n3) — WiFi attack suite for M5Stack.
-- [M5Stick-Nemo](https://github.com/n0xa/m5stick-nemo) by [@n0xa](https://github.com/n0xa) — multi-tool firmware for M5Stick devices.
-
-Bruce builds on many free-software libraries, and parts of the RF and NFC/RFID
-modules are derived from other projects. See [THIRD_PARTY.md](./THIRD_PARTY.md)
-for third-party attribution and copyleft-compliance details.
-
-## :construction: Disclaimer
-
-Bruce is a tool for cyber offensive and red team operations, distributed under the terms of the Affero General Public License (AGPL). It is intended for legal and authorized security testing purposes only. Use of this software for any malicious or unauthorized activities is strictly prohibited. By downloading, installing, or using Bruce, you agree to comply with all applicable laws and regulations. This software is provided free of charge, and we do not accept payments for copies or modifications. The developers of Bruce assume no liability for any misuse of the software. Use at your own risk.
+Signatures shift as vendors change hardware. Treat SUSPICIOUS and INFO results as leads
+to verify, not as positive identifications.
