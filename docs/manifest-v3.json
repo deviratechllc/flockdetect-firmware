@@ -1,0 +1,14 @@
+{
+  "name": "FlockDetect v3",
+  "version": "3",
+  "new_install_prompt_erase": true,
+  "improv": false,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        { "path": "Bruce-lilygo-t-embed-cc1101-v3.bin", "offset": 0 }
+      ]
+    }
+  ]
+}

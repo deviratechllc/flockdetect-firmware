@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlockDetect firmware — LilyGO T-Embed CC1101</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121a24; --panel2:#0e151d; --border:#22303f;
+    --fg:#e6edf3; --muted:#8aa0b4; --accent:#ff5a5f; --accent2:#22c55e; --code:#0a0e13;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:16px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:820px;margin:0 auto;padding:40px 20px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:22px;margin-bottom:28px}
+  h1{margin:0 0 6px;font-size:26px;letter-spacing:.5px}
+  h1 .fl{color:var(--accent)}
+  .sub{color:var(--muted);font-size:14px}
+  .by{margin-top:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+    color:var(--muted);font-size:13.5px}
+  .by b{color:var(--fg);font-weight:600}
+  .by a{display:inline-flex;align-items:center;gap:7px;text-decoration:none;
+    color:var(--fg);background:var(--panel2);border:1px solid var(--border);
+    border-radius:999px;padding:5px 13px;transition:border-color .15s}
+  .by a:hover{border-color:var(--accent)}
+  .by a svg{width:15px;height:15px;fill:currentColor}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:20px 22px;margin:18px 0}
+  h2{font-size:15px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);
+    margin:0 0 14px}
+  a.dl{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    text-decoration:none;color:var(--fg);background:var(--panel2);
+    border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin:10px 0;
+    transition:border-color .15s,transform .05s}
+  a.dl:hover{border-color:var(--accent)}
+  a.dl:active{transform:translateY(1px)}
+  a.dl .name{font-weight:600}
+  a.dl .name small{display:block;color:var(--muted);font-weight:400;font-size:12.5px;margin-top:3px}
+  a.dl .meta{color:var(--accent2);white-space:nowrap;font-size:14px}
+  .badge{display:inline-block;background:#1c2733;border:1px solid var(--border);
+    border-radius:999px;padding:3px 10px;font-size:12px;color:var(--muted);margin:2px 6px 2px 0}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;
+    padding:14px 16px;overflow-x:auto;font-size:13.5px;margin:10px 0}
+  code{color:#cbe6ff}
+  .hash{word-break:break-all;color:var(--muted);font-size:12.5px}
+  ul{padding-left:20px;margin:10px 0}
+  li{margin:5px 0}
+  .warn{border-left:3px solid var(--accent);padding:2px 0 2px 14px;color:var(--muted);font-size:14px}
+  .flashrow{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:4px 0 2px}
+  button.flash{font:inherit;font-size:15px;font-weight:600;cursor:pointer;
+    color:#06110a;background:var(--accent2);border:1px solid var(--accent2);
+    border-radius:10px;padding:13px 22px;transition:filter .15s,transform .05s}
+  button.flash:hover{filter:brightness(1.12)}
+  button.flash:active{transform:translateY(1px)}
+  button.flash.alt{color:var(--fg);background:var(--panel2);border-color:var(--border)}
+  button.flash.alt:hover{border-color:var(--accent);filter:none}
+  esp-web-install-button[install-unsupported] .flashrow{display:none}
+  .nosupport{color:var(--muted);font-size:14px}
+  .nosupport b{color:var(--fg)}
+  footer{color:var(--muted);font-size:12.5px;margin-top:36px;border-top:1px solid var(--border);
+    padding-top:18px}
+  .tiers b{color:var(--fg)}
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 18px}
+  @media(max-width:640px){.shots{grid-template-columns:1fr}}
+  .shots figure{margin:0}
+  .shots img{width:100%;height:auto;display:block;border:1px solid var(--border);
+    border-radius:12px;background:#05080b}
+  .shots figcaption{color:var(--muted);font-size:12.5px;margin-top:7px;text-align:center}
+  .disclaimer{border-color:#3a2428}
+  .disclaimer h2{color:var(--accent)}
+  .disclaimer p{margin:0 0 11px;font-size:13.5px;color:var(--muted)}
+  .disclaimer p:last-child{margin-bottom:0}
+  .disclaimer b{color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="fl">FlockDetect</span> firmware</h1>
+    <div class="sub">Bruce build for the <b>LilyGO T-Embed CC1101</b> · ESP32-S3 · passive Flock&nbsp;Safety / surveillance-device detector</div>
+    <div class="by">
+      <span>created by <b>deviratechllc</b></span>
+      <a href="https://github.com/deviratechllc/flockdetect-firmware" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        Source on GitHub
+      </a>
+    </div>
+  </header>
+
+  <div class="shots">
+    <figure>
+      <img src="img/flockdetect-scanning.png" alt="FlockDetect scanning with no devices found yet" width="1400" height="583">
+      <figcaption>Scanning — channel hopping, nothing found yet</figcaption>
+    </figure>
+    <figure>
+      <img src="img/flockdetect-detections.png" alt="FlockDetect listing three suspicious devices matched on OUI" width="1400" height="581">
+      <figcaption>Suspicious devices matched on OUI, with radar bearing and signal</figcaption>
+    </figure>
+  </div>
+
+  <div class="card">
+    <h2>Flash from your browser</h2>
+    <p style="margin:0 0 14px;color:var(--muted);font-size:14px">
+      Plug the board in over USB-C and click. No esptool, no Python — the whole
+      flash happens in the browser over Web Serial.</p>
+
+    <esp-web-install-button manifest="manifest-v3.json">
+      <div class="flashrow" slot="activate">
+        <button class="flash">⚡ Flash FlockDetect v3</button>
+        <span style="color:var(--muted);font-size:13px">current · versioned diagnostics build</span>
+      </div>
+      <div slot="unsupported" class="nosupport">
+        <b>Your browser can't flash.</b> Web Serial is only available in desktop
+        <b>Chrome</b>, <b>Edge</b> or <b>Opera</b> — not Firefox, Safari, or any mobile
+        browser. Use one of those, or fall back to esptool below.
+      </div>
+      <div slot="not-allowed" class="nosupport">
+        <b>Not available over plain HTTP.</b> Web Serial needs a secure context —
+        load this page over <b>https://</b>.
+      </div>
+    </esp-web-install-button>
+
+
+    <p class="warn" style="margin-top:16px">If the board isn't offered in the port
+      picker, hold <b>BOOT</b> while tapping <b>RESET</b>, then click again. Coming from
+      very different firmware? Tick <b>Erase device</b> in the install dialog.</p>
+  </div>
+
+  <div class="card">
+    <h2>Download — v3 <span class="badge" style="border-color:#1f4a2a;color:#6ee7a0">current</span></h2>
+    <p style="margin:0 0 10px;color:var(--muted);font-size:13.5px">Built 2026-08-14 · adds the on-screen build badge</p>
+    <a class="dl" href="Bruce-lilygo-t-embed-cc1101-v3.bin" download>
+      <span class="name">Bruce-lilygo-t-embed-cc1101-v3.bin
+        <small>Full merged image — flash to offset <code>0x0</code>. Recommended.</small></span>
+      <span class="meta">4.1 MB</span>
+    </a>
+    <a class="dl" href="FlockDetect-app-only-firmware-v3.bin" download>
+      <span class="name">FlockDetect-app-only-firmware-v3.bin
+        <small>App partition only — for OTA / partial flash at the app offset.</small></span>
+      <span class="meta">4.0 MB</span>
+    </a>
+    <a class="dl" href="SHA256SUMS.txt" download>
+      <span class="name">SHA256SUMS.txt<small>Checksums for the v3 images and the theme pack.</small></span>
+      <span class="meta">verify</span>
+    </a>
+    <div class="hash">sha256 (v3 merged): f2d5f6d2f845a8bfaba4833afc379a1b5bf25d00bc6182c1d813918fd14b3d94</div>
+  </div>
+
+  <div class="card">
+    <h2>What's new in v3</h2>
+    <ul>
+      <li><b>Build badge on screen</b> — the scan banner, every diagnostic page header and the options menu now show which build is running, so a photo or a bug report identifies itself.</li>
+      <li><b>Diagnostics pages</b> (<code>SEL → Diagnostics</code>; SEL cycles pages, Up/Dn scrolls, ESC exits). Three views: a per-stage capture counter chain, the IE signatures actually computed from wildcard probes, and every source heard regardless of tier — plus an optional <code>flockdiag_*.csv</code> on SD.</li>
+      <li><b>No more screen strobing.</b> The border and title are painted once instead of every frame, and the list no longer reshuffles between redraws.</li>
+      <li><b>Title collision fixed</b> — the scan banner was drawing over the "FLOCKDETECT" header.</li>
+      <li><b>Animated UI</b> — radar sweep with signal-scaled blips, eased RSSI bars, new-device highlight, and an expanding-ring alert.</li>
+    </ul>
+    <p class="warn">Detection has been validated in the field against known Flock Safety cameras cross-referenced with <a href="https://deflock.me" target="_blank" rel="noopener" style="color:var(--accent2)">DeFlock</a>. The diagnostic pages are there so results can be checked rather than taken on trust.</p>
+  </div>
+
+  <div class="card">
+    <h2>Previous versions</h2>
+    <p style="margin:0 0 10px;color:var(--muted);font-size:13.5px">
+      Every earlier build stays on GitHub Releases with its own checksums and release
+      notes — v2 (diagnostics, 2026-08-13) and v1 (initial, 2026-08-12).</p>
+    <a class="dl" href="https://github.com/deviratechllc/flockdetect-firmware/releases" target="_blank" rel="noopener">
+      <span class="name">All releases on GitHub
+        <small>Merged and app-only images for every version, with sha256 sums.</small></span>
+      <span class="meta">browse &rarr;</span>
+    </a>
+    <p class="warn">Browser flashing is offered for the current build only. To flash an
+      older one, download its merged image and use esptool as shown below.</p>
+  </div>
+
+  <div class="card">
+    <h2>Doge theme <span class="badge" style="border-color:#4a3a1f;color:#F2B705">optional</span></h2>
+    <img src="img/doge-theme.png" alt="The sixteen Doge menu icons, each a Shiba Inu in sunglasses with a doge-speak caption" width="1360" height="300" style="width:100%;height:auto;display:block;border:1px solid var(--border);border-radius:10px;background:#120C04;margin:0 0 14px">
+    <p style="margin:0 0 12px;color:var(--muted);font-size:14px">
+      Shiba in thug-life shades, three-quarter pose. Doge gold on near-black, a breathing gold LED, and every menu icon is the dog —
+      <code>much wifi</code>, <code>such files</code>, <code>where am</code>. Purely
+      cosmetic; it changes the Bruce menu skin and touches no firmware behaviour.</p>
+    <a class="dl" href="FlockDetect-doge-theme.zip" download>
+      <span class="name">FlockDetect-doge-theme.zip
+        <small>Unzip, drop the <code>doge</code> folder on your SD card or LittleFS, then
+          Config &rarr; UI Theme &rarr; <code>doge.json</code></small></span>
+      <span class="meta">91 KB</span>
+    </a>
+    <p class="warn">Works on stock Bruce too — it uses the standard theme format, so it
+      isn't tied to this build. Icons are sized for the T-Embed's 320x170 panel.</p>
+  </div>
+
+  <div class="card">
+    <h2>Flash it manually</h2>
+    <p style="margin:0 0 6px;color:var(--muted);font-size:14px">USB-C the board, then with <a href="#" style="color:var(--accent2)">esptool</a>:</p>
+<pre><code>esptool.py --chip esp32s3 --baud 921600 write_flash 0x0 Bruce-lilygo-t-embed-cc1101-v3.bin</code></pre>
+    <p class="warn">If the board doesn't enter download mode automatically, hold <b>BOOT</b> while tapping <b>RESET</b>, then run the command. Erase first with <code>esptool.py --chip esp32s3 erase_flash</code> if you're coming from very different firmware.</p>
+  </div>
+
+  <div class="card">
+    <h2>What it does</h2>
+    <p style="margin-top:0">Passively identifies Flock Safety ALPR gear and related surveillance devices over WiFi and BLE, with a tiered alert model:</p>
+    <p class="tiers">
+      <span class="badge" style="border-color:#4a1f22;color:#ff8a8d"><b>CONFIRMED</b> → alarm + LED</span>
+      <span class="badge" style="border-color:#4a3a1f;color:#e6b450"><b>SUSPICIOUS</b> → visual</span>
+      <span class="badge"><b>INFO</b> → list only</span>
+    </p>
+    <ul>
+      <li><b>WiFi</b> (<code>WiFi → FlockDetect</code>): wildcard-probe IE-signature fingerprint, <code>Flock-XXXXXX</code>/<code>test_flck</code> SSID patterns, hidden-SSID flagging, and Flock / SoundThinking / camera-vendor OUI tables.</li>
+      <li><b>BLE</b> (<code>Bluetooth → FlockDetect BLE</code>): Raven acoustic-sensor service UUIDs (+ firmware estimate), Flock-family device names, and the XUNTONG manufacturer ID.</li>
+      <li>Encoder-scrolled device list, full-screen alert takeover with buzzer + LED-ring flash, per-MAC anti-spam, and CSV logging to SD (optional GPS tagging).</li>
+    </ul>
+    <p class="warn">Detection only — passive receive, no transmit. Signatures shift as vendors change hardware; treat SUSPICIOUS/INFO as leads to verify, not positive IDs.</p>
+  </div>
+
+  <div class="card disclaimer">
+    <h2>Disclaimer</h2>
+    <p><b>This is strictly a scanning device.</b> It passively listens for radio frames
+      that nearby equipment already broadcasts. It does not transmit, jam, deauthenticate,
+      associate with, log into or interfere with any device or network, and it captures no
+      payload traffic.</p>
+    <p><b>Not affiliated with Flock Safety</b> or any other manufacturer whose equipment it
+      attempts to identify. "Flock Safety", "Raven", "SoundThinking" and all other names and
+      marks are the property of their respective owners, used here only to describe what the
+      tool looks for.</p>
+    <p><b>Not affiliated with the Bruce firmware project</b> or its maintainers. This is an
+      independent fork — please don't take FlockDetect problems to them. The same goes for the
+      upstream detection projects credited below, whose work is ported here with attribution
+      but who have no involvement in this build.</p>
+    <p><b>Use at your own risk.</b> Detection is signature-based. It will produce false
+      positives and false negatives, and signatures go stale as vendors change their equipment.
+      Nothing it reports is a positive identification of anything. You are responsible for complying with the laws
+      on radio monitoring and recording that apply where you are. Provided as-is, without
+      warranty of any kind.</p>
+  </div>
+
+  <footer>
+    Detection ported from <b>flock-you</b> (MIT), <b>flock-you-wifi-recon</b> (MIT) and <b>FlockSquawk</b> (GPL-3.0); UI on the <b>Bruce</b> firmware (AGPL-3.0). See <code>THIRD_PARTY.md</code> for full attribution. Built for the LilyGO T-Embed CC1101.
+  </footer>
+</div>
+<!-- esp-web-tools 10.4.0, self-hosted: the published bundle lazy-loads hashed
+     sibling chunks, so the whole dist/web/ directory is mirrored rather than a
+     single file pulled from a CDN. Keeps the flasher working with no external
+     dependency at page load. -->
+<script type="module" src="esp-web-tools/install-button.js"></script>
+</body>
+</html>
