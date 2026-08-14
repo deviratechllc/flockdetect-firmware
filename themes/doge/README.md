@@ -2,9 +2,9 @@
 
 ![Doge theme icons](./theme-preview.png)
 
-Shiba Inu meme theme in pixel art — the dog in thug-life shades. Doge gold on
-near-black, and the labels are in doge-speak: `much wifi`, `such files`,
-`where am`, `very long`.
+Shiba Inu meme theme in pixel art — the dog in thug-life shades, three-quarter
+pose with the muzzle low and left. Doge gold on near-black, and the labels are in
+doge-speak: `much wifi`, `such files`, `where am`, `very long`.
 
 ## Install
 
@@ -37,7 +37,7 @@ the theme itself.
 
 ## Regenerating
 
-**`make-icons.py` holds the real source**: a hand-authored 28x25 pixel grid, plus the
+**`make-icons.py` holds the real source**: a hand-authored 32x28 pixel grid, plus the
 caption for each menu key. Edit the grid, not the PNGs.
 
 ```sh
@@ -53,6 +53,11 @@ Two things it is careful about, worth preserving if you change it:
   art into mush, and ImageMagick's default is smooth.
 - The 1x master is written as **PAM, not PPM** — PPM has no alpha channel, and the
   icons need transparency around the dog.
+- Scale factors are **whole numbers** (3x for icons, 4x for the splash). A fractional
+  resize drops pixel rows unevenly and the grid stops looking deliberate.
+
+The preview strip above squeezes sixteen icons into 1360px, so it undersells them —
+on a 320x170 panel each icon draws at 160x140 and the ears and lens glints are crisp.
 
 Captions use `Courier-Bold`; its blockiness suits the pixel art. Comic Sans would be
 more on-brand for the meme, and dropping the TTF in and changing `FONT` is all it takes.

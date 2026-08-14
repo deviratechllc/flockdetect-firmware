@@ -18,41 +18,45 @@ HERE = Path(__file__).resolve().parent
 # --- palette ---------------------------------------------------------------
 PAL = {
     ".": (0x00, 0x00, 0x00, 0),  # transparent
-    "D": (0xC9, 0x7F, 0x2E, 255),  # outline / dark fur
-    "F": (0xE3, 0xA2, 0x4A, 255),  # mid fur
-    "L": (0xF5, 0xC0, 0x69, 255),  # light fur
-    "C": (0xF7, 0xDC, 0xAC, 255),  # cream muzzle
-    "K": (0x17, 0x10, 0x0A, 255),  # black - shades, nose, mouth
+    "K": (0x17, 0x10, 0x0A, 255),  # outline, shades, nose
+    "D": (0xA9, 0x66, 0x22, 255),  # deep fur / inner ear
+    "F": (0xD9, 0x94, 0x3A, 255),  # mid fur
+    "L": (0xF0, 0xB9, 0x5E, 255),  # light fur
+    "E": (0xEB, 0xCC, 0x9B, 255),  # muzzle
+    "C": (0xF7, 0xDC, 0xAC, 255),  # muzzle highlight
     "W": (0xFF, 0xFF, 0xFF, 255),  # lens glint
 }
 
 # --- the dog ---------------------------------------------------------------
 GRID = [
-    "............................",
-    "....DD................DD....",
-    "...DFFD..............DFFD...",
-    "...DFLFD............DFLFD...",
-    "...DFLLFD..........DFLLFD...",
-    "....DFLLFDDDDDDDDDDFLLFD....",
-    ".....DFLLLLLLLLLLLLLLFD.....",
-    "....DFLLLLLLLLLLLLLLLLFD....",
-    "...DFLLLLLLLLLLLLLLLLLLFD...",
-    "...DFLLLLLLLLLLLLLLLLLLFD...",
-    "...DFLLLLLLLLLLLLLLLLLLFD...",
-    "...DKKKKKKKKKKKKKKKKKKKKD...",
-    "...DKKWWKKKKKKKKWWKKKKKKD...",
-    "...DKKWWKKKKKKKKWWKKKKKKD...",
-    "...DKKKKKKKKKKKKKKKKKKKKD...",
-    "...DFCCCCCCCCCCCCCCCCCCFD...",
-    "...DFCCCCCCCCCCCCCCCCCCFD...",
-    "....DCCCCCCCKKKKCCCCCCCD....",
-    "....DCCCCCCCKKKKCCCCCCCD....",
-    ".....DCCCCCCCKKCCCCCCCD.....",
-    ".....DCCCCKKCKKCKKCCCCD.....",
-    "......DCCCCKKKKKKKCCCCD.....",
-    "......DDCCCCCCCCCCCDD.......",
-    ".......DDDDDDDDDDDDD........",
-    "............................",
+    "................................",
+    ".....KK..................KK.....",
+    "....KDKK................KKDK....",
+    "....KDDK................KDDK....",
+    "...KDFDK................KDFDK...",
+    "...KDFFK................KFFDK...",
+    "...KDFLFKKKKKKKKKKKKKKKKFLFDK...",
+    "..KDFLLLLLLLLLLLLLLLLLLLLLLFDK..",
+    "..KDFLLLLLLLLLLLLLLLLLLLLLLFDK..",
+    ".KDFLLLLLLLLLLLLLLLLLLLLLLLLFDK.",
+    ".KDFLLLLLLLLLLLLLLLLLLLLLLLLFDK.",
+    ".KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK.",
+    ".KKWWKKKKKKKKKKKKWWKKKKKKKKKKKK.",
+    ".KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK.",
+    ".KDFLLLLLLLLLLLLLLLLLLLLLLLLFDK.",
+    ".KDFLLLLLLLLLLLLLLLLLLLLLLLLFDK.",
+    ".KDFCCCCCCCELLLLLLLLLLLLLLLLFDK.",
+    ".KDCCCKKKKCCELLLLLLLLLLLLLLLFDK.",
+    "..KCCKKKKKKCELLLLLLLLLLLLLLFDK..",
+    "..KCCCKKKKCCCELLLLLLLLLLLLLFDK..",
+    "..KCCCCCCCCCCCELLLLLLLLLLLLFDK..",
+    "..KCCCKCCCKCCCCELLLLLLLLLLFDK...",
+    "...KCCCKKKCCCCCCELLLLLLLLLFDK...",
+    "...KCCCCCCCCCCCCCELLLLLLLFDK....",
+    "....KCCCCCCCCCCCCCELLLLLFDK.....",
+    ".....KKCCCCCCCCCCCCELLLFDK......",
+    ".......KKKCCCCCCCCCCEFFDK.......",
+    "..........KKKKKKKKKKKKKK........",
 ]
 
 # menu key -> doge-speak caption
@@ -105,20 +109,21 @@ def optimise(path: Path) -> None:
 
 def main() -> None:
     master = write_master()
-    face = scaled(master, 4, "doge-pixel.png")  # 112x100, the icon-sized dog
+    face = scaled(master, 3, "doge-pixel.png")  # 96x84 -- 3x keeps pixels exact
+    # and leaves clear space for the caption inside the 160x140 icon.
 
     for key, caption in ICONS.items():
         out = HERE / f"{key}.png"
         subprocess.run([
             "convert", "-size", "160x140", "xc:none",
-            str(face), "-gravity", "north", "-geometry", "+0+4", "-composite",
+            str(face), "-gravity", "north", "-geometry", "+0+12", "-composite",
             "-font", FONT, "-pointsize", "17", "-fill", GOLD,
             "-gravity", "south", "-annotate", "+0+10", caption,
             str(out),
         ], check=True)
         optimise(out)
 
-    boot_face = scaled(master, 5, "doge-boot-face.png")  # 140x125
+    boot_face = scaled(master, 4, "doge-boot-face.png")  # 128x112
     boot = HERE / "boot.png"
     subprocess.run([
         "convert", "-size", "300x170", f"xc:{BG}",
