@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Regenerate the Doge theme artwork.
 
-The pixel grid below is the source of truth -- every icon, the boot splash and
-the preview strip are derived from it, so edit the grid rather than the PNGs.
-
-Original artwork: hand-authored pixel grid, nothing traced or imported, so the
-theme carries no third-party image licensing.
+`doge-source.png` is the master: a transparent-background Shiba illustration in
+thug-life shades, supplied by the theme author. Every icon, the boot splash and
+the preview strip are composed from it, so replace that file rather than editing
+the generated PNGs individually.
 
 Needs ImageMagick on PATH. Run from this directory:  python3 make-icons.py
 """
@@ -14,50 +13,7 @@ import subprocess
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-
-# --- palette ---------------------------------------------------------------
-PAL = {
-    ".": (0x00, 0x00, 0x00, 0),  # transparent
-    "K": (0x17, 0x10, 0x0A, 255),  # outline, shades, nose
-    "D": (0xA9, 0x66, 0x22, 255),  # deep fur / inner ear
-    "F": (0xD9, 0x94, 0x3A, 255),  # mid fur
-    "L": (0xF0, 0xB9, 0x5E, 255),  # light fur
-    "E": (0xEB, 0xCC, 0x9B, 255),  # muzzle
-    "C": (0xF7, 0xDC, 0xAC, 255),  # muzzle highlight
-    "W": (0xFF, 0xFF, 0xFF, 255),  # lens glint
-}
-
-# --- the dog ---------------------------------------------------------------
-GRID = [
-    "................................",
-    ".....KK..................KK.....",
-    "....KDKK................KKDK....",
-    "....KDDK................KDDK....",
-    "...KDFDK................KDFDK...",
-    "...KDFFK................KFFDK...",
-    "...KDFLFKKKKKKKKKKKKKKKKFLFDK...",
-    "..KDFLLLLLLLLLLLLLLLLLLLLLLFDK..",
-    "..KDFLLLLLLLLLLLLLLLLLLLLLLFDK..",
-    ".KDFLLLLLLLLLLLLLLLLLLLLLLLLFDK.",
-    ".KDFLLLLLLLLLLLLLLLLLLLLLLLLFDK.",
-    ".KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK.",
-    ".KKWWKKKKKKKKKKKKWWKKKKKKKKKKKK.",
-    ".KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK.",
-    ".KDFLLLLLLLLLLLLLLLLLLLLLLLLFDK.",
-    ".KDFLLLLLLLLLLLLLLLLLLLLLLLLFDK.",
-    ".KDFCCCCCCCELLLLLLLLLLLLLLLLFDK.",
-    ".KDCCCKKKKCCELLLLLLLLLLLLLLLFDK.",
-    "..KCCKKKKKKCELLLLLLLLLLLLLLFDK..",
-    "..KCCCKKKKCCCELLLLLLLLLLLLLFDK..",
-    "..KCCCCCCCCCCCELLLLLLLLLLLLFDK..",
-    "..KCCCKCCCKCCCCELLLLLLLLLLFDK...",
-    "...KCCCKKKCCCCCCELLLLLLLLLFDK...",
-    "...KCCCCCCCCCCCCCELLLLLLLFDK....",
-    "....KCCCCCCCCCCCCCELLLLLFDK.....",
-    ".....KKCCCCCCCCCCCCELLLFDK......",
-    ".......KKKCCCCCCCCCCEFFDK.......",
-    "..........KKKKKKKKKKKKKK........",
-]
+SOURCE = HERE / "doge-source.png"
 
 # menu key -> doge-speak caption
 ICONS = {
@@ -70,96 +26,66 @@ ICONS = {
 }
 
 GOLD, CREAM, BRONZE, BG = "#F2B705", "#F7DCAC", "#C68A3E", "#120C04"
-FONT = "Courier-Bold"  # blocky monospace suits pixel art; no Comic Sans here
+FONT = "Bookman-Demi"  # rounded and friendly; no Comic Sans on this box
+
+ICON_W, ICON_H = 160, 140  # sized for the T-Embed's 320x170 panel
+FACE_H = 98                # leaves room for the caption underneath
 
 
-def write_master() -> Path:
-    """1x PAM master. PAM rather than PPM because we need the alpha channel."""
-    grid = [r.ljust(max(map(len, GRID)), ".") for r in GRID]
-    w, h = len(grid[0]), len(grid)
-    px = bytearray()
-    for row in grid:
-        for ch in row:
-            px += bytes(PAL[ch])
-    hdr = (
-        f"P7\nWIDTH {w}\nHEIGHT {h}\nDEPTH 4\nMAXVAL 255\n"
-        f"TUPLTYPE RGB_ALPHA\nENDHDR\n"
-    ).encode()
-    p = HERE / "doge-pixel.pam"
-    p.write_bytes(hdr + bytes(px))
-    return p
+def run(args):
+    subprocess.run([str(a) for a in args], check=True)
 
 
-def scaled(master: Path, factor: int, out: str) -> Path:
-    """Nearest-neighbour only -- any smooth filter would blur the pixels."""
-    p = HERE / out
-    subprocess.run(
-        ["convert", str(master), "-filter", "point", "-resize", f"{factor*100}%", str(p)],
-        check=True,
-    )
-    return p
+def optimise(path: Path):
+    """Palette-reduce. The art is flat-shaded, so 128 colours is indistinguishable
+    by eye and cuts each icon to a couple of KB."""
+    run(["convert", path, "-strip", "-depth", "8", "-colors", "128", f"PNG8:{path}"])
 
 
-def optimise(path: Path) -> None:
-    subprocess.run(
-        ["convert", str(path), "-strip", "-depth", "8", "-colors", "32", f"PNG8:{path}"],
-        check=True,
-    )
-
-
-def main() -> None:
-    master = write_master()
-    face = scaled(master, 3, "doge-pixel.png")  # 96x84 -- 3x keeps pixels exact
-    # and leaves clear space for the caption inside the 160x140 icon.
+def main():
+    if not SOURCE.exists():
+        raise SystemExit(f"missing master artwork: {SOURCE}")
 
     for key, caption in ICONS.items():
         out = HERE / f"{key}.png"
-        subprocess.run([
-            "convert", "-size", "160x140", "xc:none",
-            str(face), "-gravity", "north", "-geometry", "+0+12", "-composite",
-            "-font", FONT, "-pointsize", "17", "-fill", GOLD,
-            "-gravity", "south", "-annotate", "+0+10", caption,
-            str(out),
-        ], check=True)
+        run([
+            "convert", "-size", f"{ICON_W}x{ICON_H}", "xc:none",
+            "(", SOURCE, "-resize", f"x{FACE_H}", ")",
+            "-gravity", "north", "-geometry", "+0+2", "-composite",
+            "-font", FONT, "-pointsize", 19, "-fill", GOLD,
+            "-gravity", "south", "-annotate", "+0+8", caption,
+            out,
+        ])
         optimise(out)
 
-    boot_face = scaled(master, 4, "doge-boot-face.png")  # 128x112
     boot = HERE / "boot.png"
-    subprocess.run([
+    run([
         "convert", "-size", "300x170", f"xc:{BG}",
-        str(boot_face), "-gravity", "west", "-geometry", "+10+0", "-composite",
-        "-font", FONT, "-pointsize", "26", "-fill", GOLD,
-        "-gravity", "east", "-annotate", "+16-34", "such wow",
-        "-font", FONT, "-pointsize", "22", "-fill", CREAM,
-        "-gravity", "east", "-annotate", "+16+0", "much scan",
-        "-font", FONT, "-pointsize", "22", "-fill", BRONZE,
-        "-gravity", "east", "-annotate", "+16+34", "very flock",
-        str(boot),
-    ], check=True)
+        "(", SOURCE, "-resize", "x150", ")",
+        "-gravity", "west", "-geometry", "+14+0", "-composite",
+        "-font", FONT, "-pointsize", 27, "-fill", GOLD,
+        "-gravity", "east", "-annotate", "+20-34", "such wow",
+        "-font", FONT, "-pointsize", 23, "-fill", CREAM,
+        "-gravity", "east", "-annotate", "+20+0", "much scan",
+        "-font", FONT, "-pointsize", 23, "-fill", BRONZE,
+        "-gravity", "east", "-annotate", "+20+34", "very flock",
+        boot,
+    ])
     optimise(boot)
-    (HERE / "doge-boot-face.png").unlink()
 
     keys = list(ICONS)
-    rows = [keys[:8], keys[8:]]
     strips = []
-    for i, row in enumerate(rows):
+    for i, row in enumerate((keys[:8], keys[8:])):
         strip = HERE / f"_row{i}.png"
-        subprocess.run(
-            ["montage", *[str(HERE / f"{k}.png") for k in row],
-             "-tile", f"{len(row)}x1", "-geometry", "+5+5", "-background", BG, str(strip)],
-            check=True,
-        )
+        run(["montage", *[HERE / f"{k}.png" for k in row],
+             "-tile", f"{len(row)}x1", "-geometry", "+5+5", "-background", BG, strip])
         strips.append(strip)
     preview = HERE / "theme-preview.png"
-    subprocess.run(
-        ["montage", *map(str, strips), "-tile", "1x2", "-geometry", "+0+0",
-         "-background", BG, str(preview)],
-        check=True,
-    )
+    run(["montage", *strips, "-tile", "1x2", "-geometry", "+0+0",
+         "-background", BG, preview])
     for s in strips:
         s.unlink()
     optimise(preview)
-    master.unlink()
     print(f"regenerated {len(ICONS)} icons, boot.png and theme-preview.png")
 
 
