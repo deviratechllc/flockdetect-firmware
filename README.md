@@ -17,6 +17,17 @@ Everything Bruce already does is still here. This fork adds one module,
 
 Detection is **passive receive only** — the module never transmits.
 
+<p align="center">
+  <a href="https://deviratechllc.github.io/flockdetect-firmware/">
+    <img src="./media/flockdetect/flash-button.svg" width="360" alt="Flash firmware now">
+  </a>
+</p>
+
+<p align="center">
+  <sub>Flashes straight from the browser over Web Serial — no esptool, no Python.<br>
+  Needs desktop Chrome, Edge or Opera; Firefox and Safari don't implement Web Serial.</sub>
+</p>
+
 ---
 
 ## Status
