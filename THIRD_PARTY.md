@@ -127,6 +127,19 @@ pointing back to this document.
   tracking, first-seen anti-spam, alert takeover) and the surveillance-camera
   vendor OUI table (curated from the **FlockOff** database).
 
+### Related prior art (no code taken)
+
+- **wgreenberg/flock-you** — <https://github.com/wgreenberg/flock-you>.
+  No license file published upstream at the time of writing. Credited for the
+  BLE manufacturer-ID research behind the XUNTONG `0x09C8` detection, which
+  reached this module via flock-you-wifi-recon rather than directly.
+- **zmattmanz/flock-detection** — <https://github.com/zmattmanz/flock-detection>.
+  No license file published upstream at the time of writing. An ESP32-S3
+  surveillance detector covering the same ground as this module — Flock Safety
+  ALPR cameras and Raven gunshot sensors over WiFi and BLE, with confidence
+  scoring and GPS-tagged CSV logging. Credited as prior art for the
+  tiered-confidence and logging approach; no code was copied from it.
+
 ## Bundled libraries (linked dependencies)
 
 Fetched via PlatformIO `lib_deps` (see `platformio.ini`) and linked into the

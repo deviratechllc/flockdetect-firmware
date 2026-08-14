@@ -116,10 +116,10 @@ Bruce is licensed AGPL-3.0; see [LICENSE](./LICENSE).
 
 ## Credits
 
-FlockDetect is a port, not original research. The detection logic comes from four
-upstream projects, adapted to Bruce's promiscuous-capture path, UI and data model.
-Full per-function attribution — including which upstream contributed which routine —
-is in **[THIRD_PARTY.md](./THIRD_PARTY.md)**.
+FlockDetect is a port, not original research. The detection logic comes from the
+upstream projects below, adapted to Bruce's promiscuous-capture path, UI and data
+model. Full per-function attribution — including which upstream contributed which
+routine — is in **[THIRD_PARTY.md](./THIRD_PARTY.md)**.
 
 | Project | | Contributed |
 |---|---|---|
@@ -127,11 +127,12 @@ is in **[THIRD_PARTY.md](./THIRD_PARTY.md)**.
 | **[JakeSwiz/flock-you-wifi-recon](https://github.com/JakeSwiz/flock-you-wifi-recon)** | MIT¹ | SSID text-pattern matching, hidden-SSID flagging with per-BSSID dedup, the curated Flock / SoundThinking OUI tables, and the BLE detector (Raven service UUIDs, device names, XUNTONG manufacturer ID). |
 | **[f1yaw4y/FlockSquawk](https://github.com/f1yaw4y/FlockSquawk)** | GPL-3.0 | The tiered CONFIRMED / SUSPICIOUS / INFO alert model — device tracking, first-seen anti-spam, alert takeover — and the surveillance-camera vendor OUI table curated from the FlockOff database. |
 | **[wgreenberg/flock-you](https://github.com/wgreenberg/flock-you)** | — ² | BLE manufacturer-ID research behind the XUNTONG detection. |
+| **[zmattmanz/flock-detection](https://github.com/zmattmanz/flock-detection)** | — ² | ESP32-S3 surveillance detector covering the same ground — Flock ALPR cameras and Raven gunshot sensors over WiFi/BLE, with confidence scoring and GPS-tagged CSV logging. Prior art for the tiered-confidence and logging approach. |
 
 ¹ MIT per the source headers, © 2026 colonelpanichacks (fork by JakeSwiz); the repository
 carries no separate `LICENSE` file.
-² No license file published upstream at the time of writing; credited here for research,
-no code was taken directly.
+² No license file published upstream at the time of writing; credited for research and
+prior art, no code was taken directly.
 
 Underlying research credited by those projects: **@NitekryDPaul** (OUI list, receiver-address
 technique), **Michael / DeFlockJoplin** (wildcard-probe signature), **GainSec** (2025 Flock
