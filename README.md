@@ -103,6 +103,42 @@ page 1.
 
 ---
 
+## TODO
+
+### GPS upgrade → DeFlock submission
+
+Add a GPS module and turn confirmed sightings into coordinates that can be
+contributed to **[DeFlock](https://deflock.me)**, the open-source project mapping
+license plate readers across the US.
+
+Hardware mod being tracked for this: <https://www.thingiverse.com/thing:7374864>
+
+**What already exists.** The module has optional GPS support today — `GPS: ON` in
+the options menu brings up TinyGPS++ on `HardwareSerial(2)` using
+`bruceConfigPins.gps_bus`, and the detection CSV already carries `lat`/`lon`
+columns that are populated whenever a fix is valid.
+
+**What's missing.**
+
+- [ ] Source and fit the GPS module; confirm the pinout against `bruceConfigPins.gps_bus`
+      and that the UART doesn't contend with the CC1101 or SD on shared pins.
+- [ ] Surface fix quality on screen — satellite count and HDOP, not just valid/invalid.
+      A detection tagged with a 50 m fix is worse than an untagged one.
+- [ ] Hold position per device rather than per sighting: record the coordinate at
+      *peak* RSSI across a pass, which is far closer to the camera than first contact.
+- [ ] Export in a form DeFlock/OpenStreetMap can ingest, and decide the tagging
+      scheme before generating anything.
+- [ ] Dedupe across sessions so repeated drive-bys of the same camera don't become
+      separate map entries.
+
+> **Gate this behind working detection.** FlockDetect has not yet produced a
+> confirmed hit (see [Status](#status)). Contributing unverified, auto-generated
+> positions to a public dataset that people rely on would be worse than
+> contributing nothing — every coordinate should be human-confirmed before it goes
+> anywhere near DeFlock.
+
+---
+
 ## Upstream Bruce
 
 This fork tracks [BruceDevices/firmware](https://github.com/BruceDevices/firmware).
