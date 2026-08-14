@@ -143,6 +143,14 @@ pointing back to this document.
   randomisation and so can tie a randomising device to one radio; and the observation
   in its `docs/ble.md` that a Flock BLE `local_name` matches **exactly**, which
   demoted our substring matches from CONFIRMED to SUSPICIOUS.
+- **yetisoldier/CYD-Flock-You** — <https://github.com/yetisoldier/CYD-Flock-You>.
+  No license file published at the time of writing, so no code was taken. Its
+  `docs/deflock-pairing-protocol.md` is the wire protocol `src/modules/wifi/flock_link.cpp`
+  and the companion Android app implement: Nordic UART Service transport,
+  `FYHELLO`/`FYGPS`/`FYSIM` commands, and the `pair_status` / `detection` JSON
+  shapes. Protocols are not copyrightable and NUS is a public Nordic standard.
+  The 76.2 m (250 ft) candidate dedupe radius and the "set camera direction by
+  hand, never infer it from travel" rule are theirs too.
 - **zmattmanz/flock-detection** — <https://github.com/zmattmanz/flock-detection>.
   No license file published upstream at the time of writing. An ESP32-S3
   surveillance detector covering the same ground as this module — Flock Safety

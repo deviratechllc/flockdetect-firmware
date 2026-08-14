@@ -1,0 +1,9 @@
+# Machine-specific SDK path
+local.properties
+# Build output
+.gradle/
+build/
+app/build/
+*.apk
+*.iml
+.idea/

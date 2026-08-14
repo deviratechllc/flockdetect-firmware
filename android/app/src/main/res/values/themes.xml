@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.FlockDetect" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#F2B705</item>
+        <item name="colorOnPrimary">#120C04</item>
+        <item name="android:statusBarColor">#120C04</item>
+    </style>
+</resources>

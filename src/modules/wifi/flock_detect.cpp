@@ -18,6 +18,7 @@
 // ============================================================================
 
 #include "flock_detect.h"
+#include "flock_link.h"
 
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -795,14 +796,19 @@ static void fdLogAppend(const FdDevice &d) {
         macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x", d.mac[0], d.mac[1], d.mac[2],
         d.mac[3], d.mac[4], d.mac[5]
     );
+    double phLat, phLon;
+    float phAcc;
+    uint32_t phAge;
+    bool havePhoneGps = flock_link_gps(phLat, phLon, phAcc, phAge);
     bool haveGps = fdGpsEnabled && fdGps.location.isValid();
     char buf[256];
-    if (haveGps) {
+    if (haveGps || havePhoneGps) {
         snprintf(
             buf, sizeof(buf), "%s,%s,%s,\"%s\",%d,%d,%lu,%u,%lu,%.6f,%.6f,%lu\n", macStr,
             fdTierName(d.tier), d.method, d.ssid, d.rssi, d.peakRssi, (unsigned long)d.channel,
-            (unsigned)d.lastSeq, (unsigned long)d.hits, fdGps.location.lat(),
-            fdGps.location.lng(), (unsigned long)d.lastSeen
+            (unsigned)d.lastSeq, (unsigned long)d.hits,
+            haveGps ? fdGps.location.lat() : phLat, haveGps ? fdGps.location.lng() : phLon,
+            (unsigned long)d.lastSeen
         );
     } else {
         snprintf(
@@ -926,7 +932,13 @@ static void fdRecord(
 
     // Log confirmed / suspicious detections (skip pure INFO noise) once per
     // new sighting or tier upgrade.
-    if ((isNew || tierUp) && d.tier >= FD_SUSPICIOUS) fdLogAppend(d);
+    if ((isNew || tierUp) && d.tier >= FD_SUSPICIOUS) {
+        fdLogAppend(d);
+        flock_link_send_detection(
+            d.mac, d.tier, d.method, d.ssid, d.rssi, d.peakRssi, d.channel, d.lastSeq, d.hits, "",
+            channel == 0
+        );
+    }
 }
 
 // ============================================================================
@@ -1879,6 +1891,10 @@ static void fdOptionsMenu() {
     opts.push_back({String("Scan ch: ") + FD_CH_SETS[fdChannelPreset].label, [&]() {
                         fdChannelMenu();
                     }});
+    opts.push_back({flock_link_active() ? "Phone link: ON" : "Phone link: OFF", [&]() {
+                        if (flock_link_active()) flock_link_stop();
+                        else flock_link_start();
+                    }});
     opts.push_back({fdSoundEnabled ? "Sound: ON" : "Sound: OFF", [&]() { fdSoundEnabled = !fdSoundEnabled; }});
 #ifdef HAS_RGB_LED
     opts.push_back({fdLedEnabled ? "LED: ON" : "LED: OFF", [&]() { fdLedEnabled = !fdLedEnabled; }});
@@ -2249,6 +2265,13 @@ void flock_detect_setup() {
             // that takes a few milliseconds cannot let the ring back up.
             fdDrainRing();
             fdGpsPoll();
+            if (flock_link_active()) {
+                flock_link_set_status(
+                    fdCurChannel, fdFramesAll, fdFramesSeen, fdRingDropped, fdConfirmedCount,
+                    fdSuspiciousCount
+                );
+                flock_link_tick();
+            }
 
             int act = fdUiTick(lastFrame, lastData);
             fdDrainRing();
@@ -2275,6 +2298,7 @@ void flock_detect_setup() {
     }
 
     fdSpriteEnd();
+    flock_link_stop();
     fd_stop_wifi();
     fdGpsStop();
 #ifdef HAS_RGB_LED
