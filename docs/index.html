@@ -106,10 +106,10 @@
       Plug the board in over USB-C and click. No esptool, no Python — the whole
       flash happens in the browser over Web Serial.</p>
 
-    <esp-web-install-button manifest="manifest-v3.json">
+    <esp-web-install-button manifest="manifest-v4.json">
       <div class="flashrow" slot="activate">
-        <button class="flash">⚡ Flash FlockDetect v3</button>
-        <span style="color:var(--muted);font-size:13px">current · versioned diagnostics build</span>
+        <button class="flash">⚡ Flash FlockDetect v4</button>
+        <span style="color:var(--muted);font-size:13px">current · channel presets + sequence numbers</span>
       </div>
       <div slot="unsupported" class="nosupport">
         <b>Your browser can't flash.</b> Web Serial is only available in desktop
@@ -129,28 +129,31 @@
   </div>
 
   <div class="card">
-    <h2>Download — v3 <span class="badge" style="border-color:#1f4a2a;color:#6ee7a0">current</span></h2>
-    <p style="margin:0 0 10px;color:var(--muted);font-size:13.5px">Built 2026-08-14 · adds the on-screen build badge</p>
-    <a class="dl" href="Bruce-lilygo-t-embed-cc1101-v3.bin" download>
-      <span class="name">Bruce-lilygo-t-embed-cc1101-v3.bin
+    <h2>Download — v4 <span class="badge" style="border-color:#1f4a2a;color:#6ee7a0">current</span></h2>
+    <p style="margin:0 0 10px;color:var(--muted);font-size:13.5px">Built 2026-08-14 · selectable scan channels, sequence numbers</p>
+    <a class="dl" href="Bruce-lilygo-t-embed-cc1101-v4.bin" download>
+      <span class="name">Bruce-lilygo-t-embed-cc1101-v4.bin
         <small>Full merged image — flash to offset <code>0x0</code>. Recommended.</small></span>
       <span class="meta">4.1 MB</span>
     </a>
-    <a class="dl" href="FlockDetect-app-only-firmware-v3.bin" download>
-      <span class="name">FlockDetect-app-only-firmware-v3.bin
+    <a class="dl" href="FlockDetect-app-only-firmware-v4.bin" download>
+      <span class="name">FlockDetect-app-only-firmware-v4.bin
         <small>App partition only — for OTA / partial flash at the app offset.</small></span>
       <span class="meta">4.0 MB</span>
     </a>
     <a class="dl" href="SHA256SUMS.txt" download>
-      <span class="name">SHA256SUMS.txt<small>Checksums for the v3 images and the theme pack.</small></span>
+      <span class="name">SHA256SUMS.txt<small>Checksums for the v4 images and the theme pack.</small></span>
       <span class="meta">verify</span>
     </a>
-    <div class="hash">sha256 (v3 merged): f2d5f6d2f845a8bfaba4833afc379a1b5bf25d00bc6182c1d813918fd14b3d94</div>
+    <div class="hash">sha256 (v4 merged): b9ccbc3cf3a0fac28aa4a698f91eabccfb188f0de9f2ea82eecbbad224c25907</div>
   </div>
 
   <div class="card">
-    <h2>What's new in v3</h2>
+    <h2>What's new in v4</h2>
     <ul>
+      <li><b>Selectable scan channels</b> — <code>SEL &rarr; Scan ch</code>. Fast 1/6/11 sweeps in 1.2s instead of 4.4s, which matters when driving past a camera that probes intermittently; World 1&ndash;13 and Japan 1&ndash;14 cover channels outside the US plan.</li>
+      <li><b>Sequence-number capture</b> — the 802.11 counter keeps incrementing through MAC randomisation, so it can tie a randomising device back to one radio. Shown in diagnostics and logged to both CSVs.</li>
+      <li><b>Stricter BLE naming</b> — an exact name match is CONFIRMED; a substring is now SUSPICIOUS rather than jumping to the top tier.</li>
       <li><b>Build badge on screen</b> — the scan banner, every diagnostic page header and the options menu now show which build is running, so a photo or a bug report identifies itself.</li>
       <li><b>Diagnostics pages</b> (<code>SEL → Diagnostics</code>; SEL cycles pages, Up/Dn scrolls, ESC exits). Three views: a per-stage capture counter chain, the IE signatures actually computed from wildcard probes, and every source heard regardless of tier — plus an optional <code>flockdiag_*.csv</code> on SD.</li>
       <li><b>No more screen strobing.</b> The border and title are painted once instead of every frame, and the list no longer reshuffles between redraws.</li>
@@ -164,7 +167,7 @@
     <h2>Previous versions</h2>
     <p style="margin:0 0 10px;color:var(--muted);font-size:13.5px">
       Every earlier build stays on GitHub Releases with its own checksums and release
-      notes — v2 (diagnostics, 2026-08-13) and v1 (initial, 2026-08-12).</p>
+      notes — v3 (build badge), v2 (diagnostics) and v1 (initial).</p>
     <a class="dl" href="https://github.com/deviratechllc/flockdetect-firmware/releases" target="_blank" rel="noopener">
       <span class="name">All releases on GitHub
         <small>Merged and app-only images for every version, with sha256 sums.</small></span>
@@ -194,7 +197,7 @@
   <div class="card">
     <h2>Flash it manually</h2>
     <p style="margin:0 0 6px;color:var(--muted);font-size:14px">USB-C the board, then with <a href="#" style="color:var(--accent2)">esptool</a>:</p>
-<pre><code>esptool.py --chip esp32s3 --baud 921600 write_flash 0x0 Bruce-lilygo-t-embed-cc1101-v3.bin</code></pre>
+<pre><code>esptool.py --chip esp32s3 --baud 921600 write_flash 0x0 Bruce-lilygo-t-embed-cc1101-v4.bin</code></pre>
     <p class="warn">If the board doesn't enter download mode automatically, hold <b>BOOT</b> while tapping <b>RESET</b>, then run the command. Erase first with <code>esptool.py --chip esp32s3 erase_flash</code> if you're coming from very different firmware.</p>
   </div>
 
