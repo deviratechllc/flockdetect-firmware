@@ -80,7 +80,23 @@ the list.
 
 With `SD Log: ON`, a companion `flockdiag_*.csv` is written alongside the detection log
 for offline analysis — useful because the device is normally flashed over USB rather
-than kept on a serial console.
+than kept on a serial console. Both logs carry the 802.11 **sequence number**, which
+keeps counting through MAC randomisation and so can tie a randomising device back to a
+single radio.
+
+---
+
+## Scan channels
+
+`SEL → Scan ch` picks how wide the sweep goes. The setting survives leaving and
+re-entering the module.
+
+| Preset | Sweep | Use |
+|---|---|---|
+| Fast 1/6/11 | 1.2 s | the non-overlapping trio — best while moving, since a slow sweep can miss a camera you drive past |
+| US 1–11 | 4.4 s | default |
+| World 1–13 | 5.2 s | channels 12–13 are legal outside the US |
+| Japan 1–14 | 5.6 s | channel 14 is 802.11b-only |
 
 ---
 
@@ -194,12 +210,15 @@ routine — is in **[THIRD_PARTY.md](./THIRD_PARTY.md)**.
 | **[JakeSwiz/flock-you-wifi-recon](https://github.com/JakeSwiz/flock-you-wifi-recon)** | MIT¹ | SSID text-pattern matching, hidden-SSID flagging with per-BSSID dedup, the curated Flock / SoundThinking OUI tables, and the BLE detector (Raven service UUIDs, device names, XUNTONG manufacturer ID). |
 | **[f1yaw4y/FlockSquawk](https://github.com/f1yaw4y/FlockSquawk)** | GPL-3.0 | The tiered CONFIRMED / SUSPICIOUS / INFO alert model — device tracking, first-seen anti-spam, alert takeover — and the surveillance-camera vendor OUI table curated from the FlockOff database. |
 | **[wgreenberg/flock-you](https://github.com/wgreenberg/flock-you)** | — ² | BLE manufacturer-ID research behind the XUNTONG detection. |
+| **[NSM-Barii/flock-back](https://github.com/NSM-Barii/flock-back)** | MIT ³ | Ideas, not code: the 1/6/11 channel preset, 802.11 sequence-number capture, and exact-match BLE naming. |
 | **[zmattmanz/flock-detection](https://github.com/zmattmanz/flock-detection)** | — ² | ESP32-S3 surveillance detector covering the same ground — Flock ALPR cameras and Raven gunshot sensors over WiFi/BLE, with confidence scoring and GPS-tagged CSV logging. Prior art for the tiered-confidence and logging approach. |
 
 ¹ MIT per the source headers, © 2026 colonelpanichacks (fork by JakeSwiz); the repository
 carries no separate `LICENSE` file.
 ² No license file published upstream at the time of writing; credited for research and
 prior art, no code was taken directly.
+³ MIT, but nothing was copied — only techniques described in its documentation were
+reimplemented here.
 
 Underlying research credited by those projects: **@NitekryDPaul** (OUI list, receiver-address
 technique), **Michael / DeFlockJoplin** (wildcard-probe signature), **GainSec** (2025 Flock

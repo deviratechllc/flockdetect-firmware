@@ -43,8 +43,34 @@
 // or a bug report identifies which build it came from without guesswork.
 #define FD_VERSION "v3"
 
-static const uint8_t FD_CHANNELS[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-static const int FD_NCH = sizeof(FD_CHANNELS) / sizeof(FD_CHANNELS[0]);
+// Scan channel set, chosen from the options menu. Deliberately not reset by
+// fdResetSession() -- it is a user preference, not session state.
+//
+// The 1/6/11 preset is the non-overlapping trio (idea from flock-back's
+// wardriver BAND_2_4): a full sweep takes 1.2s instead of 4.4s, which matters
+// when driving past a camera that only probes intermittently.
+enum FdChPreset { FD_CH_FAST = 0, FD_CH_US, FD_CH_WORLD, FD_CH_JP, FD_CH_PRESETS };
+
+static const uint8_t FD_CH_FAST_LIST[] = {1, 6, 11};
+static const uint8_t FD_CH_US_LIST[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+static const uint8_t FD_CH_WORLD_LIST[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
+static const uint8_t FD_CH_JP_LIST[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+
+struct FdChannelSet {
+    const char *label;
+    const uint8_t *list;
+    uint8_t count;
+};
+static const FdChannelSet FD_CH_SETS[FD_CH_PRESETS] = {
+    {"Fast 1/6/11", FD_CH_FAST_LIST,  sizeof(FD_CH_FAST_LIST)                    },
+    {"US 1-11",     FD_CH_US_LIST,    sizeof(FD_CH_US_LIST)                      },
+    {"World 1-13",  FD_CH_WORLD_LIST, sizeof(FD_CH_WORLD_LIST)                   },
+    {"Japan 1-14",  FD_CH_JP_LIST,    sizeof(FD_CH_JP_LIST)                      },
+};
+
+static uint8_t fdChannelPreset = FD_CH_US; // current behaviour stays the default
+static inline const uint8_t *fdChannels() { return FD_CH_SETS[fdChannelPreset].list; }
+static inline int fdChannelCount() { return FD_CH_SETS[fdChannelPreset].count; }
 
 static const uint16_t FD_DWELL_MS = 400;   // per-channel dwell (recon uses 400)
 static const int8_t FD_RSSI_MIN_DEFAULT = -95;
@@ -136,6 +162,7 @@ struct FdDevice {
     uint32_t firstSeen;
     uint32_t lastSeen;
     uint32_t lastAlarmMs;
+    uint16_t lastSeq; // 802.11 sequence number, see fdProcessFrame
     // --- presentation-only state (never affects detection) ---
     int16_t dispRssi;    // eased RSSI in 1/8 dBm, chases `rssi` for smooth bars
     uint32_t flashUntil; // row highlight expiry for a newly seen device
@@ -183,6 +210,7 @@ static uint32_t fdRejLocalMac = 0; // OUI lookups skipped: locally-administered 
 static uint8_t fdLastMac[6] = {0};
 static int8_t fdLastRssi = 0;
 static uint8_t fdLastSubtype = 0xFF;
+static uint16_t fdLastSeq = 0;
 static char fdLastSsid[20] = {0};
 
 // Distinct IE signatures computed from wildcard probe-requests. Recorded
@@ -208,6 +236,7 @@ struct FdSeen {
     uint8_t tier;
     char ssid[18];
     uint16_t hits;
+    uint16_t seq;
 };
 #define FD_MAX_SEEN 64
 static FdSeen fdSeen[FD_MAX_SEEN];
@@ -333,6 +362,15 @@ static void fd_start_wifi() {
     if (e != ESP_OK && e != ESP_ERR_WIFI_INIT_STATE)
         Serial.printf("[FlockDetect] wifi_start: %s\n", esp_err_to_name(e));
     esp_wifi_disconnect(); // drop any STA link so channel hopping isn't pinned
+
+    // main.cpp sets this at boot, but esp_wifi_init() above resets country to the
+    // driver default whenever WiFi had been deinitialised -- and the default policy
+    // caps the channel list, so esp_wifi_set_channel(12..14) would fail silently.
+    const wifi_country_t fdCountry = {
+        .cc = "US", .schan = 1, .nchan = 14, .max_tx_power = 20,
+        .policy = WIFI_COUNTRY_POLICY_MANUAL
+    };
+    esp_wifi_set_country(&fdCountry);
 
     esp_wifi_set_promiscuous(false); // reset in case the framework left it on
     wifi_promiscuous_filter_t filt = {};
@@ -701,7 +739,7 @@ static void fdLogInit() {
         fdFs = nullptr;
         return;
     }
-    f.println("mac,tier,method,ssid,rssi,peak_rssi,channel,hits,lat,lon,ts");
+    f.println("mac,tier,method,ssid,rssi,peak_rssi,channel,seq,hits,lat,lon,ts");
     f.close();
 
     // Companion diagnostic log: one row per *candidate* frame (not per
@@ -714,7 +752,7 @@ static void fdLogInit() {
         fdDiagLogPath = "";
         return;
     }
-    d.println("ts,src_mac,subtype,rssi,channel,oui_class,ssid,ie_sig");
+    d.println("ts,src_mac,subtype,rssi,channel,seq,oui_class,ssid,ie_sig");
     d.close();
 }
 
@@ -722,17 +760,18 @@ static void fdLogInit() {
 // new observations (first sighting of a MAC, first sighting of an IE
 // signature) so a busy channel cannot turn this into a write storm.
 static void fdDiagLogAppend(
-    const uint8_t *mac, uint8_t subtype, int8_t rssi, uint8_t channel, uint8_t ouiClass,
-    const char *ssid, const char *ieSig
+    const uint8_t *mac, uint8_t subtype, int8_t rssi, uint8_t channel, uint16_t seq,
+    uint8_t ouiClass, const char *ssid, const char *ieSig
 ) {
     if (!fdLogEnabled || fdFs == nullptr || fdDiagLogPath == "") return;
     File f = fdFs->open(fdDiagLogPath, FILE_APPEND);
     if (!f) return;
     char buf[220];
     snprintf(
-        buf, sizeof(buf), "%lu,%02x:%02x:%02x:%02x:%02x:%02x,%u,%d,%u,%u,\"%s\",\"%s\"\n",
+        buf, sizeof(buf), "%lu,%02x:%02x:%02x:%02x:%02x:%02x,%u,%d,%u,%u,%u,\"%s\",\"%s\"\n",
         (unsigned long)millis(), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], (unsigned)subtype,
-        (int)rssi, (unsigned)channel, (unsigned)ouiClass, ssid ? ssid : "", ieSig ? ieSig : ""
+        (int)rssi, (unsigned)channel, (unsigned)seq, (unsigned)ouiClass, ssid ? ssid : "",
+        ieSig ? ieSig : ""
     );
     f.print(buf);
     f.close();
@@ -760,16 +799,16 @@ static void fdLogAppend(const FdDevice &d) {
     char buf[256];
     if (haveGps) {
         snprintf(
-            buf, sizeof(buf), "%s,%s,%s,\"%s\",%d,%d,%lu,%lu,%.6f,%.6f,%lu\n", macStr,
+            buf, sizeof(buf), "%s,%s,%s,\"%s\",%d,%d,%lu,%u,%lu,%.6f,%.6f,%lu\n", macStr,
             fdTierName(d.tier), d.method, d.ssid, d.rssi, d.peakRssi, (unsigned long)d.channel,
-            (unsigned long)d.hits, fdGps.location.lat(), fdGps.location.lng(),
-            (unsigned long)d.lastSeen
+            (unsigned)d.lastSeq, (unsigned long)d.hits, fdGps.location.lat(),
+            fdGps.location.lng(), (unsigned long)d.lastSeen
         );
     } else {
         snprintf(
-            buf, sizeof(buf), "%s,%s,%s,\"%s\",%d,%d,%lu,%lu,,,%lu\n", macStr, fdTierName(d.tier),
-            d.method, d.ssid, d.rssi, d.peakRssi, (unsigned long)d.channel, (unsigned long)d.hits,
-            (unsigned long)d.lastSeen
+            buf, sizeof(buf), "%s,%s,%s,\"%s\",%d,%d,%lu,%u,%lu,,,%lu\n", macStr,
+            fdTierName(d.tier), d.method, d.ssid, d.rssi, d.peakRssi, (unsigned long)d.channel,
+            (unsigned)d.lastSeq, (unsigned long)d.hits, (unsigned long)d.lastSeen
         );
     }
     f.print(buf);
@@ -828,7 +867,7 @@ static int fdAllocDevice() {
 // first-seen CONFIRMED hit (with a per-MAC cooldown for re-alarms).
 static void fdRecord(
     const uint8_t *mac, uint8_t tier, const char *method, const char *ssid, int8_t rssi,
-    uint8_t channel
+    uint8_t channel, uint16_t seq = 0
 ) {
     uint32_t now = millis();
     int idx = fdFindDevice(mac);
@@ -853,6 +892,7 @@ static void fdRecord(
     d.rssi = rssi;
     if (rssi > d.peakRssi) d.peakRssi = rssi;
     d.channel = channel;
+    d.lastSeq = seq;
     d.hits++;
 
     bool tierUp = tier > d.tier;
@@ -924,10 +964,11 @@ static int fdSeenFind(const uint8_t *mac) {
 }
 
 // Records any management-frame source. Returns true on first sighting.
-static bool fdSeenAdd(const uint8_t *mac, int8_t rssi, uint8_t ouiClass, const char *ssid) {
+static bool fdSeenAdd(const uint8_t *mac, int8_t rssi, uint8_t ouiClass, const char *ssid, uint16_t seq) {
     int idx = fdSeenFind(mac);
     if (idx >= 0) {
         fdSeen[idx].rssi = rssi;
+        fdSeen[idx].seq = seq;
         if (fdSeen[idx].hits < 0xFFFF) fdSeen[idx].hits++;
         if (ssid && ssid[0] && !fdSeen[idx].ssid[0]) {
             strncpy(fdSeen[idx].ssid, ssid, sizeof(fdSeen[idx].ssid) - 1);
@@ -956,6 +997,7 @@ static bool fdSeenAdd(const uint8_t *mac, int8_t rssi, uint8_t ouiClass, const c
     s.ouiClass = ouiClass;
     s.tier = FD_NONE;
     s.hits = 1;
+    s.seq = seq;
     if (ssid && ssid[0]) {
         strncpy(s.ssid, ssid, sizeof(s.ssid) - 1);
         s.ssid[sizeof(s.ssid) - 1] = '\0';
@@ -985,6 +1027,12 @@ static void fdProcessFrame(const uint8_t *payload, uint16_t rawLen, int8_t rssi,
     uint8_t fc = payload[0];
     uint8_t subtype = (fc >> 4) & 0xF;
     const uint8_t *src = payload + 10; // addr2
+
+    // Sequence Control, bytes 22-23: 12-bit sequence number, 4-bit fragment.
+    // Idea from flock-back. The counter is per-radio and keeps incrementing
+    // across MAC randomisation, so it can tie a randomising device to one
+    // transmitter when the OUI vector is blind to it.
+    uint16_t seq = (uint16_t)(((payload[23] << 8) | payload[22]) >> 4) & 0x0FFF;
 
     const uint8_t *tagged;
     if (subtype == 0x8 || subtype == 0x5) {
@@ -1044,11 +1092,12 @@ static void fdProcessFrame(const uint8_t *payload, uint16_t rawLen, int8_t rssi,
     memcpy(fdLastMac, src, 6);
     fdLastRssi = rssi;
     fdLastSubtype = subtype;
+    fdLastSeq = seq;
     strncpy(fdLastSsid, seenSsid, sizeof(fdLastSsid) - 1);
     fdLastSsid[sizeof(fdLastSsid) - 1] = '\0';
-    bool firstSighting = fdSeenAdd(src, rssi, (uint8_t)ouiClass, seenSsid);
+    bool firstSighting = fdSeenAdd(src, rssi, (uint8_t)ouiClass, seenSsid, seq);
     if (firstSighting && ouiClass == FD_OUI_NONE && !(src[0] & 0x02))
-        fdDiagLogAppend(src, subtype, rssi, channel, (uint8_t)ouiClass, seenSsid, "");
+        fdDiagLogAppend(src, subtype, rssi, channel, seq, (uint8_t)ouiClass, seenSsid, "");
 
     // --- Vector 1: wildcard-probe IE signature (strongest) -----------------
     if (subtype == 0x4 && ssidData && ssidLen == 0) {
@@ -1060,10 +1109,10 @@ static void fdProcessFrame(const uint8_t *payload, uint16_t rawLen, int8_t rssi,
         // Logged whether or not it matched -- a near-miss here is the single
         // most useful piece of evidence when confirmed hardware goes unseen.
         if (ieSig[0] && fdSigLogAdd(ieSig, src))
-            fdDiagLogAppend(src, subtype, rssi, channel, (uint8_t)ouiClass, "", ieSig);
+            fdDiagLogAppend(src, subtype, rssi, channel, seq, (uint8_t)ouiClass, "", ieSig);
         if (match) {
             fdCandIe++;
-            fdRecord(src, FD_CONFIRMED, "ie_sig", "", rssi, channel);
+            fdRecord(src, FD_CONFIRMED, "ie_sig", "", rssi, channel, seq);
             return;
         }
     }
@@ -1074,7 +1123,7 @@ static void fdProcessFrame(const uint8_t *payload, uint16_t rawLen, int8_t rssi,
     if (isHidden && (ouiClass == FD_OUI_HIGH || ouiClass == FD_OUI_COMMUNITY || ouiClass == FD_OUI_MFR)) {
         if (!fdSeenHidden(src)) {
             fdAddHidden(src);
-            fdRecord(src, FD_SUSPICIOUS, "hidden_ssid", "<hidden>", rssi, channel);
+            fdRecord(src, FD_SUSPICIOUS, "hidden_ssid", "<hidden>", rssi, channel, seq);
         }
         return;
     }
@@ -1095,38 +1144,38 @@ static void fdProcessFrame(const uint8_t *payload, uint16_t rawLen, int8_t rssi,
 
     // --- Tier resolution (FlockSquawk computeWiFiAlertLevel shape) ---------
     if (ssidClass == FD_SSID_STRONG) {
-        fdRecord(src, FD_CONFIRMED, ssidRule, ssidStr, rssi, channel);
+        fdRecord(src, FD_CONFIRMED, ssidRule, ssidStr, rssi, channel, seq);
         return;
     }
     if (flockHighOui && ssidClass != FD_SSID_NONE) {
         // Flock hardware OUI + any SSID hit -> confirmed.
-        fdRecord(src, FD_CONFIRMED, "oui+ssid", ssidStr, rssi, channel);
+        fdRecord(src, FD_CONFIRMED, "oui+ssid", ssidStr, rssi, channel, seq);
         return;
     }
     if (flockHighOui) {
-        fdRecord(src, FD_SUSPICIOUS, "oui_flock", ssidStr, rssi, channel);
+        fdRecord(src, FD_SUSPICIOUS, "oui_flock", ssidStr, rssi, channel, seq);
         return;
     }
     if (ouiClass == FD_OUI_COMMUNITY) {
-        fdRecord(src, FD_SUSPICIOUS, "oui_community", ssidStr, rssi, channel);
+        fdRecord(src, FD_SUSPICIOUS, "oui_community", ssidStr, rssi, channel, seq);
         return;
     }
     if (ouiClass == FD_OUI_MFR) {
-        fdRecord(src, FD_SUSPICIOUS, "oui_mfr", ssidStr, rssi, channel);
+        fdRecord(src, FD_SUSPICIOUS, "oui_mfr", ssidStr, rssi, channel, seq);
         return;
     }
     if (ssidClass == FD_SSID_WEAK) {
-        fdRecord(src, FD_SUSPICIOUS, ssidRule, ssidStr, rssi, channel);
+        fdRecord(src, FD_SUSPICIOUS, ssidRule, ssidStr, rssi, channel, seq);
         return;
     }
     if (ouiClass == FD_OUI_SOUND) {
-        fdRecord(src, FD_INFO, "oui_soundthinking", ssidStr, rssi, channel);
+        fdRecord(src, FD_INFO, "oui_soundthinking", ssidStr, rssi, channel, seq);
         return;
     }
     if (ouiClass == FD_OUI_CAM) {
         char m[20];
         snprintf(m, sizeof(m), "cam:%s", camVendor ? camVendor : "?");
-        fdRecord(src, FD_INFO, m, ssidStr, rssi, channel);
+        fdRecord(src, FD_INFO, m, ssidStr, rssi, channel, seq);
         return;
     }
 }
@@ -1621,8 +1670,9 @@ static void fdDrawDiagCapture() {
     if (fdLastSubtype != 0xFF) {
         const char *st = fdLastSubtype == 0x8 ? "beacon" : (fdLastSubtype == 0x4 ? "preq" : "presp");
         snprintf(
-            b, sizeof(b), "last %02x:%02x:%02x:%02x:%02x:%02x %ddB %s", fdLastMac[0], fdLastMac[1],
-            fdLastMac[2], fdLastMac[3], fdLastMac[4], fdLastMac[5], fdLastRssi, st
+            b, sizeof(b), "last %02x:%02x:%02x:%02x:%02x:%02x %ddB %s q%u", fdLastMac[0],
+            fdLastMac[1], fdLastMac[2], fdLastMac[3], fdLastMac[4], fdLastMac[5], fdLastRssi, st,
+            (unsigned)fdLastSeq
         );
         fdDiagLine(b, TFT_CYAN);
         snprintf(b, sizeof(b), "  \"%s\"", fdLastSsid);
@@ -1689,9 +1739,9 @@ static void fdDrawDiagSeen() {
     for (size_t i = (size_t)fdDiagScroll; i < fdSeenCount; i++) {
         FdSeen &s = fdSeen[i];
         snprintf(
-            b, sizeof(b), "%02x:%02x:%02x:%02x:%02x:%02x %c %s %d %s", s.mac[0], s.mac[1], s.mac[2],
-            s.mac[3], s.mac[4], s.mac[5], fdTierName(s.tier)[0],
-            ouiNames[s.ouiClass <= FD_OUI_CAM ? s.ouiClass : 0], s.rssi, s.ssid
+            b, sizeof(b), "%02x:%02x:%02x:%02x:%02x:%02x %c %s %d q%u %s", s.mac[0], s.mac[1],
+            s.mac[2], s.mac[3], s.mac[4], s.mac[5], fdTierName(s.tier)[0],
+            ouiNames[s.ouiClass <= FD_OUI_CAM ? s.ouiClass : 0], s.rssi, (unsigned)s.seq, s.ssid
         );
         fdDiagLine(b, s.tier != FD_NONE ? fdTierColor(s.tier) : ((s.mac[0] & 0x02) ? TFT_DARKGREY : TFT_WHITE));
         if (fdDiagFull()) return;
@@ -1802,11 +1852,32 @@ static void fdClearList() {
     fdDiagScroll = 0;
 }
 
+// Nested submenu: pick which channels the sweep covers. Option::selected marks
+// the active preset, matching how the rest of Bruce shows current state.
+static void fdChannelMenu() {
+    std::vector<Option> opts;
+    for (uint8_t i = 0; i < FD_CH_PRESETS; i++) {
+        // Sweep time is what actually matters to the operator, so show it.
+        char label[40];
+        snprintf(
+            label, sizeof(label), "%s  (%.1fs)", FD_CH_SETS[i].label,
+            (double)FD_CH_SETS[i].count * FD_DWELL_MS / 1000.0
+        );
+        Option o = {String(label), [i]() { fdChannelPreset = i; }};
+        o.selected = (i == fdChannelPreset);
+        opts.push_back(o);
+    }
+    loopOptions(opts, MENU_TYPE_SUBMENU, "Scan channels");
+}
+
 static void fdOptionsMenu() {
     std::vector<Option> opts;
     opts.push_back({"Diagnostics", [&]() {
                         fdDiagPage = 1;
                         fdDiagScroll = 0;
+                    }});
+    opts.push_back({String("Scan ch: ") + FD_CH_SETS[fdChannelPreset].label, [&]() {
+                        fdChannelMenu();
                     }});
     opts.push_back({fdSoundEnabled ? "Sound: ON" : "Sound: OFF", [&]() { fdSoundEnabled = !fdSoundEnabled; }});
 #ifdef HAS_RGB_LED
@@ -2011,12 +2082,28 @@ class FdBleCallbacks : public NimBLEScanCallbacks {
         }
 
         // 2. Flock-family BLE device name.
-        if (tier < FD_CONFIRMED && !devName.empty()) {
+        //
+        // Exact match only for CONFIRMED. flock-back's docs are explicit that the
+        // advertised local_name equals the product name; a bare substring test
+        // promoted anything merely containing "Flock" -- a speaker named "Flocking
+        // Awesome" included -- straight to the top tier. Substring hits are kept,
+        // but as SUSPICIOUS, so the wider net costs no confidence.
+        if (!devName.empty()) {
             for (size_t i = 0; i < sizeof(FD_BLE_NAMES) / sizeof(FD_BLE_NAMES[0]); i++) {
-                if (fdContainsCI(devName.c_str(), devName.size(), FD_BLE_NAMES[i])) {
-                    tier = FD_CONFIRMED;
-                    snprintf(method, sizeof(method), "ble_name");
+                if (strcasecmp(devName.c_str(), FD_BLE_NAMES[i]) == 0) {
+                    if (tier < FD_CONFIRMED) {
+                        tier = FD_CONFIRMED;
+                        snprintf(method, sizeof(method), "ble_name");
+                    }
                     break;
+                }
+                if (fdContainsCI(devName.c_str(), devName.size(), FD_BLE_NAMES[i])) {
+                    // Never downgrade a stronger signal (e.g. a Raven UUID hit).
+                    if (tier < FD_SUSPICIOUS) {
+                        tier = FD_SUSPICIOUS;
+                        snprintf(method, sizeof(method), "ble_name?");
+                    }
+                    // Keep scanning: a later entry may still match exactly.
                 }
             }
         }
@@ -2148,7 +2235,7 @@ void flock_detect_setup() {
     bool needChrome = false;
 
     while (!returnToMenu) {
-        uint8_t ch = FD_CHANNELS[chIdx];
+        uint8_t ch = fdChannels()[chIdx];
         esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
         fdCurChannel = ch;
 
@@ -2184,7 +2271,7 @@ void flock_detect_setup() {
             lastFrame = 0;
             needChrome = false;
         }
-        chIdx = (chIdx + 1) % FD_NCH;
+        chIdx = (chIdx + 1) % fdChannelCount();
     }
 
     fdSpriteEnd();

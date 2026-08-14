@@ -133,6 +133,16 @@ pointing back to this document.
   No license file published upstream at the time of writing. Credited for the
   BLE manufacturer-ID research behind the XUNTONG `0x09C8` detection, which
   reached this module via flock-you-wifi-recon rather than directly.
+- **NSM-Barii/flock-back** — <https://github.com/NSM-Barii/flock-back>. MIT. A Python
+  wardriving tool for Linux; no code is shared with this module, and its signature
+  tables turned out to be a subset of what we already carry via flock-you-wifi-recon.
+  Three ideas were adopted from its documentation and reimplemented here:
+  the **1/6/11 non-overlapping channel preset** (its wardriver `BAND_2_4`), which
+  shortens a full sweep from 4.4s to 1.2s and matters when moving past a target;
+  **802.11 sequence-number capture** (its `wlan.seq` field), which survives MAC
+  randomisation and so can tie a randomising device to one radio; and the observation
+  in its `docs/ble.md` that a Flock BLE `local_name` matches **exactly**, which
+  demoted our substring matches from CONFIRMED to SUSPICIOUS.
 - **zmattmanz/flock-detection** — <https://github.com/zmattmanz/flock-detection>.
   No license file published upstream at the time of writing. An ESP32-S3
   surveillance detector covering the same ground as this module — Flock Safety
