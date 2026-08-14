@@ -2,10 +2,9 @@
 
 # FlockDetect
 
-A private fork of the [Bruce](https://github.com/BruceDevices/firmware) ESP32 firmware
-that adds **FlockDetect** — a passive detector for Flock Safety ALPR gear and related
-surveillance devices, built for the **LilyGO T-Embed CC1101** (ESP32-S3, 16 MB flash /
-8 MB PSRAM).
+A fork of the [Bruce](https://github.com/BruceDevices/firmware) ESP32 firmware that adds
+**FlockDetect** — a passive detector for Flock Safety ALPR gear and related surveillance
+devices, built for the **LilyGO T-Embed CC1101** (ESP32-S3, 16 MB flash / 8 MB PSRAM).
 
 Everything Bruce already does is still here. This fork adds one module,
 `src/modules/wifi/flock_detect.{h,cpp}`, reachable from two menu entries:
