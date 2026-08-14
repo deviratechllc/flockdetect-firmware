@@ -42,7 +42,7 @@
 
 // Shown as a badge on the scan banner and on the diagnostic pages, so a photo
 // or a bug report identifies which build it came from without guesswork.
-#define FD_VERSION "v4"
+#define FD_VERSION "v5"
 
 // Scan channel set, chosen from the options menu. Deliberately not reset by
 // fdResetSession() -- it is a user preference, not session state.
