@@ -1,4 +1,6 @@
-![Bruce](./media/pictures/bruce_banner.jpg)
+![FlockDetect scanning](./media/flockdetect/flockdetect-scanning.png)
+
+![FlockDetect showing suspicious devices](./media/flockdetect/flockdetect-detections.png)
 
 # FlockDetect
 
@@ -146,6 +148,33 @@ contributing guidelines and community links — is preserved verbatim at
 **[README-Bruce.md](./README-Bruce.md)**.
 
 Bruce is licensed AGPL-3.0; see [LICENSE](./LICENSE).
+
+---
+
+## Disclaimer
+
+FlockDetect is **strictly a scanning device**. It passively listens for radio frames
+that nearby equipment already broadcasts. It does not transmit, jam, deauthenticate,
+associate with, log into, or interfere with any device or network, and it captures no
+payload traffic.
+
+This project is **not affiliated with, endorsed by, sponsored by, or connected to**:
+
+- **Flock Safety**, or any other manufacturer whose equipment it attempts to identify.
+  "Flock Safety", "Raven", "SoundThinking" and all other names and marks are the
+  property of their respective owners, used here only to describe what the tool looks
+  for.
+- The **Bruce** firmware project or its maintainers. This is an independent fork —
+  please don't take FlockDetect problems to them.
+- The upstream projects credited below, whose work is ported here with attribution but
+  who have no involvement in this fork.
+
+**Use at your own risk.** Detection is signature-based and, as of this build, has not
+been confirmed against known hardware. It will produce false positives and false
+negatives, and signatures go stale as vendors change their equipment. Nothing it
+reports is a positive identification of anything. You are responsible for complying
+with the laws on radio monitoring and recording that apply where you are. Provided
+as-is, without warranty of any kind, express or implied.
 
 ---
 

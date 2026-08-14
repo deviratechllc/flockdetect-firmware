@@ -39,6 +39,10 @@
 // CONFIGURATION
 // ============================================================================
 
+// Shown as a badge on the scan banner and on the diagnostic pages, so a photo
+// or a bug report identifies which build it came from without guesswork.
+#define FD_VERSION "v3"
+
 static const uint8_t FD_CHANNELS[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
 static const int FD_NCH = sizeof(FD_CHANNELS) / sizeof(FD_CHANNELS[0]);
 
@@ -1364,6 +1368,17 @@ static void fdBannerText(char *out, size_t cap) {
         );
 }
 
+// Build badge, right-aligned on the banner row. Sits above the radar column
+// rather than in the list, so it never eats row width.
+static void fdDrawVersionBadge() {
+    const int w = 6 * (int)strlen(FD_VERSION) + 10;
+    const int x = fdContentW() - w;
+    if (x < 0) return; // panel too narrow to spare the space
+    sprite.drawRoundRect(x, 0, w, 11, 3, fdDim(bruceConfig.priColor, 150));
+    sprite.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
+    sprite.drawString(FD_VERSION, x + 5, 2, 1);
+}
+
 // Formats one list row into the caller's buffers. Widths are derived from the
 // list column so the same code fits both a 320px and a 240px panel.
 static void fdDrawRow(int y, int listW, FdDevice &d, bool selected) {
@@ -1446,6 +1461,7 @@ static void fdDrawScan() {
     char banner[56];
     fdBannerText(banner, sizeof(banner));
     sprite.drawString(banner, 0, 0, 1);
+    fdDrawVersionBadge();
 
     // Channel dwell progress: ties the radar sweep to something real.
     int barW = listW - 4;
@@ -1507,6 +1523,8 @@ static void fdDrawScanPlain() {
     fdBannerText(banner, sizeof(banner));
     tft.fillRect(FD_LEFT, FD_TOP, fdContentW(), 10, bruceConfig.bgColor);
     tft.drawString(banner, FD_LEFT, FD_TOP, 1);
+    // No sprite here, so the badge is drawn straight to the panel.
+    tft.drawString(FD_VERSION, FD_LEFT + fdContentW() - 6 * (int)strlen(FD_VERSION), FD_TOP, 1);
 
     fdClampList(rows);
 
@@ -1563,7 +1581,7 @@ static bool fdDiagFull() { return fdDiagY + 9 > fdContentH(); }
 
 static void fdDrawDiagCapture() {
     char b[80];
-    fdDiagLine("DIAG 1/3  capture chain", bruceConfig.priColor);
+    fdDiagLine("DIAG 1/3  capture chain  " FD_VERSION, bruceConfig.priColor);
 
     snprintf(
         b, sizeof(b), "rx all %lu  mgmt %lu  drop %lu", (unsigned long)fdFramesAll,
@@ -1630,7 +1648,7 @@ static void fdDiagWrap(const char *s, uint16_t color) {
 
 static void fdDrawDiagSigs() {
     char b[80];
-    snprintf(b, sizeof(b), "DIAG 2/3  IE sigs (%u distinct)", (unsigned)fdSigLogCount);
+    snprintf(b, sizeof(b), "DIAG 2/3  IE sigs (%u)  " FD_VERSION, (unsigned)fdSigLogCount);
     fdDiagLine(b, bruceConfig.priColor);
 
     if (fdSigLogCount == 0) {
@@ -1657,7 +1675,7 @@ static void fdDrawDiagSigs() {
 
 static void fdDrawDiagSeen() {
     char b[80];
-    snprintf(b, sizeof(b), "DIAG 3/3  all sources (%u)", (unsigned)fdSeenCount);
+    snprintf(b, sizeof(b), "DIAG 3/3  all sources (%u)  " FD_VERSION, (unsigned)fdSeenCount);
     fdDiagLine(b, bruceConfig.priColor);
 
     if (fdSeenCount == 0) {
@@ -1811,7 +1829,7 @@ static void fdOptionsMenu() {
                     }});
     opts.push_back({"Clear list", [&]() { fdClearList(); }});
     opts.push_back({"Exit FlockDetect", [&]() { returnToMenu = true; }});
-    loopOptions(opts, MENU_TYPE_SUBMENU, "FlockDetect");
+    loopOptions(opts, MENU_TYPE_SUBMENU, "FlockDetect " FD_VERSION);
 }
 
 // Shared per-iteration UI handling for both scan modes. Returns:
