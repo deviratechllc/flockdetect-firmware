@@ -163,19 +163,32 @@ boots unattended into scanning with SD logging off and the phone link down.
       leaving the device stuck in a module with no way out. This is the one that
       needs testing on hardware before anyone relies on it.
 
-### GPS coordinates → DeFlock submission
+### GPS module → standalone DeFlock submission
 
-> **Largely delivered in v5.** The BLE phone link means the phone supplies the
-> fix, so the detection CSV carries real coordinates with no GPS module fitted,
-> and the companion app covers peak-RSSI positioning, DeFlock/OSM-ready export and
-> cross-session dedupe. A phone's receiver also beats anything that would be
-> soldered on. What follows is only for running the device standalone.
+An onboard GPS module, so the device geotags detections **on its own**. This is a
+separate track from the phone app, not a fallback for it: the two supply the same
+field by different routes, and each covers what the other cannot.
 
-Hardware mod tracked for that case: <https://www.thingiverse.com/thing:7374864>
+The phone link needs a paired phone in the car with the app running. The GPS
+module needs nothing — which is exactly the case that matters for a device left
+running unattended (see the startup-app item above), for anyone who would rather
+not carry a second device, and for keeping a complete log when the phone is out
+of range, out of battery, or simply not there. It also keeps the SD CSV
+self-sufficient, so the card alone is a full record.
 
-The module already has optional GPS support — `GPS: ON` brings up TinyGPS++ on
-`HardwareSerial(2)` via `bruceConfigPins.gps_bus`, and the CSV's `lat`/`lon`
-columns fill in whenever a fix is valid.
+Where both are present the onboard module wins and the phone fills the gap: the
+CSV writer takes `fdGps` whenever it has a valid fix and falls back to
+`flock_link_gps()` otherwise (`flock_detect.cpp:810`). That ordering keeps the
+device authoritative over its own log rather than having rows change source
+depending on whether a phone happened to be paired at the time.
+
+Hardware mod tracked for this: <https://www.thingiverse.com/thing:7374864>
+
+**What already exists.** `GPS: ON` in the options menu brings up TinyGPS++ on
+`HardwareSerial(2)` via `bruceConfigPins.gps_bus`, and the detection CSV's
+`lat`/`lon` columns fill in whenever a fix is valid.
+
+**What's missing.**
 
 - [ ] Source and fit the module; confirm the pinout against
       `bruceConfigPins.gps_bus` and that the UART doesn't contend with the CC1101
@@ -183,8 +196,14 @@ columns fill in whenever a fix is valid.
 - [ ] Surface fix quality on screen — satellite count and HDOP, not just
       valid/invalid. A detection tagged with a 50 m fix is worse than an
       untagged one.
-- [ ] Hold position at *peak* RSSI across a pass rather than at first contact,
-      matching what the companion app already does.
+- [ ] Hold position per device at *peak* RSSI across a pass rather than at first
+      contact, which lands far closer to the camera. The companion app does this
+      already; the device needs its own copy for standalone runs.
+- [ ] Export the on-device log in a form DeFlock/OpenStreetMap can ingest, and
+      settle the tagging scheme before generating anything. `ExportManager.kt`
+      in the app is the reference for the tags.
+- [ ] Dedupe across sessions so repeated drive-bys of one camera don't become
+      separate entries — the device-side equivalent of the app's 76.2 m rule.
 
 > **Confirm before submitting.** DeFlock is a dataset people rely on, so an
 > automatically generated coordinate should never go straight into it. Treat the
