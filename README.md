@@ -128,36 +128,67 @@ page 1.
 
 ## TODO
 
-### GPS upgrade → DeFlock submission
+### Boot straight into FlockDetect
 
-Add a GPS module and turn confirmed sightings into coordinates that can be
-contributed to **[DeFlock](https://deflock.me)**, the open-source project mapping
-license plate readers across the US.
+For a device that lives in the car, powering on should land in the detector, not
+the main menu.
 
-Hardware mod being tracked for this: <https://www.thingiverse.com/thing:7374864>
+**Bruce already has the mechanism.** `StartupApp` (`src/core/startup_app.cpp`)
+maps a name to a callable, `Settings → Startup App` lists whatever it holds via
+`getAppNames()`, and `main.cpp:571` launches the stored choice — clearing it
+automatically if the name no longer resolves, so a stale setting self-heals.
 
-**What already exists.** The module has optional GPS support today — `GPS: ON` in
-the options menu brings up TinyGPS++ on `HardwareSerial(2)` using
-`bruceConfigPins.gps_bus`, and the detection CSV already carries `lat`/`lon`
-columns that are populated whenever a fix is valid.
+Registering is three lines in the `StartupApp` constructor, inside the existing
+`#ifndef LITE_VERSION` block to match the guard in `flock_detect.h`:
 
-**What's missing.**
+```cpp
+_startupApps["FlockDetect"] = []() { flock_detect_setup(); };
+_startupApps["FlockDetect BLE"] = []() { flock_detect_ble_setup(); };
+```
 
-- [ ] Source and fit the GPS module; confirm the pinout against `bruceConfigPins.gps_bus`
-      and that the UART doesn't contend with the CC1101 or SD on shared pins.
-- [ ] Surface fix quality on screen — satellite count and HDOP, not just valid/invalid.
-      A detection tagged with a 50 m fix is worse than an untagged one.
-- [ ] Hold position per device rather than per sighting: record the coordinate at
-      *peak* RSSI across a pass, which is far closer to the camera than first contact.
-- [ ] Export in a form DeFlock/OpenStreetMap can ingest, and decide the tagging
-      scheme before generating anything.
-- [ ] Dedupe across sessions so repeated drive-bys of the same camera don't become
-      separate map entries.
+**The real work is persistence.** Every FlockDetect option is a file-static that
+resets on reboot — `fdChannelPreset`, `fdLogEnabled`, `fdSoundEnabled`,
+`fdLedEnabled`, `fdRssiMin`, and whether the phone link is on. That is fine when
+a human opens the module and sets things up; it is useless for a device that
+boots unattended into scanning with SD logging off and the phone link down.
+
+- [ ] Register both entry points with `StartupApp` (the three lines above).
+- [ ] Move the options into `bruceConfig` so they survive a power cycle, following
+      how the existing settings there are stored and loaded.
+- [ ] Default SD logging **on** when launched as a startup app — an unattended
+      run that records nothing is a wasted drive.
+- [ ] Auto-enable the phone link at boot so the app can pair without anyone
+      touching the device.
+- [ ] Confirm the escape route: ESC must return to the main menu rather than
+      leaving the device stuck in a module with no way out. This is the one that
+      needs testing on hardware before anyone relies on it.
+
+### GPS coordinates → DeFlock submission
+
+> **Largely delivered in v5.** The BLE phone link means the phone supplies the
+> fix, so the detection CSV carries real coordinates with no GPS module fitted,
+> and the companion app covers peak-RSSI positioning, DeFlock/OSM-ready export and
+> cross-session dedupe. A phone's receiver also beats anything that would be
+> soldered on. What follows is only for running the device standalone.
+
+Hardware mod tracked for that case: <https://www.thingiverse.com/thing:7374864>
+
+The module already has optional GPS support — `GPS: ON` brings up TinyGPS++ on
+`HardwareSerial(2)` via `bruceConfigPins.gps_bus`, and the CSV's `lat`/`lon`
+columns fill in whenever a fix is valid.
+
+- [ ] Source and fit the module; confirm the pinout against
+      `bruceConfigPins.gps_bus` and that the UART doesn't contend with the CC1101
+      or SD on shared pins.
+- [ ] Surface fix quality on screen — satellite count and HDOP, not just
+      valid/invalid. A detection tagged with a 50 m fix is worse than an
+      untagged one.
+- [ ] Hold position at *peak* RSSI across a pass rather than at first contact,
+      matching what the companion app already does.
 
 > **Confirm before submitting.** DeFlock is a dataset people rely on, so an
 > automatically generated coordinate should never go straight into it. Treat the
 > device's output as a lead: eyeball the camera, check the position, then submit.
-
 ---
 
 ## Upstream Bruce
